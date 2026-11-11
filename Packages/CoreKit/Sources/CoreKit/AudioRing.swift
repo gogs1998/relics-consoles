@@ -13,8 +13,10 @@ public final class AudioRing: @unchecked Sendable {
     private var lastOut: Float = 0
     /// Loudest sample handed to the device and how many samples the device has pulled
     /// (diagnostics; written by the audio thread, read loosely elsewhere).
-    public private(set) var peakOut: Float = 0
-    public private(set) var samplesPulled: Int = 0
+    private let peakBits = Atomic<UInt32>(0)
+    private let pulled = Atomic<Int>(0)
+    public var peakOut: Float { Float(bitPattern: peakBits.load(ordering: .relaxed)) }
+    public var samplesPulled: Int { pulled.load(ordering: .relaxed) }
 
     public init(capacityPowerOfTwo: Int = 1 << 14) {
         precondition(capacityPowerOfTwo > 0 && capacityPowerOfTwo & (capacityPowerOfTwo - 1) == 0)
@@ -47,12 +49,14 @@ public final class AudioRing: @unchecked Sendable {
         let t = tail.load(ordering: .relaxed)
         let h = head.load(ordering: .acquiring)
         let n = min(h &- t, count)
+        var peak = peakOut
         for i in 0..<n {
             let v = buffer[(t &+ i) & mask]
             out[i] = v
-            if abs(v) > peakOut { peakOut = abs(v) }
+            if abs(v) > peak { peak = abs(v) }
         }
-        samplesPulled &+= count
+        peakBits.store(peak.bitPattern, ordering: .relaxed)
+        pulled.add(count, ordering: .relaxed)
         if n > 0 { lastOut = out[n - 1] }
         if n < count {
             var v = lastOut

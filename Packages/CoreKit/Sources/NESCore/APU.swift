@@ -285,8 +285,9 @@ final class APU {
     var pendingFrameReset = -1
 
     /// Reads memory for DMC samples (set by the console); returns the byte and stalls the CPU.
-    var dmcRead: ((UInt16) -> UInt8)?
-    var cpuStall = 0
+    /// The DMC wants a sample byte: the CPU performs the DMA at its next read cycle.
+    var dmcFetchPending = false
+    var dmcAddress: UInt16 { dmc.currentAddress }
 
     var decimator: Decimator
     private let pulseMix: [Float]
@@ -434,9 +435,17 @@ final class APU {
 
     @inline(__always)
     private func clockDMC() {
-        if dmc.bufferEmpty && dmc.bytesRemaining > 0, let read = dmcRead {
-            dmc.buffer = read(dmc.currentAddress)
-            cpuStall += 4
+        if dmc.bufferEmpty && dmc.bytesRemaining > 0 && !dmcFetchPending {
+            dmcFetchPending = true
+        }
+        clockDMCOutput()
+    }
+
+    /// Completes a DMC DMA with the byte the CPU's bus fetched.
+    func deliverDMC(_ value: UInt8) {
+        guard dmc.bufferEmpty && dmc.bytesRemaining > 0 else { return }
+        do {
+            dmc.buffer = value
             dmc.bufferEmpty = false
             dmc.currentAddress = dmc.currentAddress == 0xFFFF ? 0x8000 : dmc.currentAddress + 1
             dmc.bytesRemaining -= 1
@@ -449,6 +458,10 @@ final class APU {
                 }
             }
         }
+    }
+
+    @inline(__always)
+    private func clockDMCOutput() {
         if dmc.timer > 0 {
             dmc.timer -= 1
             return
@@ -479,6 +492,6 @@ final class APU {
         s.section("APU ")
         pulse1.sync(&s); pulse2.sync(&s); triangle.sync(&s); noise.sync(&s); dmc.sync(&s)
         s.sync(&frameMode5); s.sync(&frameIRQInhibit); s.sync(&frameIRQ); s.sync(&frameCycle)
-        s.sync(&evenCycle); s.sync(&pendingFrameReset); s.sync(&cpuStall); s.sync(&last4017)
+        s.sync(&evenCycle); s.sync(&pendingFrameReset); s.sync(&dmcFetchPending); s.sync(&last4017)
     }
 }

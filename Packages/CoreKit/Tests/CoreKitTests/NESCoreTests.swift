@@ -55,6 +55,18 @@ func framebufferHash(_ fb: UnsafeBufferPointer<UInt32>) -> UInt32 {
         #expect(throws: CoreError.self) { try nes.loadState(Data([1, 2, 3])) }
     }
 
+    /// Byte-for-byte determinism across a load, on the MMC3 probe (mapper IRQ, A12 state, APU).
+    @Test func saveStateIsDeterministicOnMMC3() throws {
+        let nes = try NESSystem(rom: try testROM("mmc3_probe.nes"), battery: nil)
+        for _ in 0..<5 { nes.runFrame(input: []) }
+        let start = nes.saveState()
+        for _ in 0..<12 { nes.runFrame(input: []) }
+        let first = nes.saveState()
+        try nes.loadState(start)
+        for _ in 0..<12 { nes.runFrame(input: []) }
+        #expect(nes.saveState() == first)
+    }
+
     @Test func speed() throws {
         let nes = try NESSystem(rom: try testROM("demo.nes"), battery: nil)
         let start = Date()

@@ -2,7 +2,7 @@
 import PackageDescription
 
 // Cores are optimised even in Debug builds so the simulator plays at full speed.
-let fast: [SwiftSetting] = [.unsafeFlags(["-Ounchecked"])]
+let fast: [SwiftSetting] = [.unsafeFlags(["-Ounchecked", "-enforce-exclusivity=unchecked"])]
 
 // mGBA (MPL-2.0), vendored unmodified in Sources/MGBA/mgba (see ThirdParty/mgba/README.md).
 // GBA core only: no GB core, threads, debugger, scripting, file system, zlib/png/lzma/elf or GL.

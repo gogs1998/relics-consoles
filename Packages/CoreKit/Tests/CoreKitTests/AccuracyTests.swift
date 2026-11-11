@@ -101,10 +101,14 @@ import Testing
                 let val = t[t.index(after: eq)...].trimmingCharacters(in: .whitespaces)
                 if val.hasPrefix("$"), let v = UInt16(val.dropFirst(), radix: 16) { symbols[name] = v }
             }
-            if t.hasPrefix("table \""), let q2 = t.dropFirst(7).firstIndex(of: "\"") {
-                let name = String(t[t.index(t.startIndex, offsetBy: 7)..<q2])
+            // `table "Name", $FF, result_X, TEST_X` and the unofficial-opcode `tblf1/tblf2` forms,
+            // where the result symbol is the second-to-last operand.
+            for prefix in ["table \"", "tblf1 \"", "tblf2 \""] where t.hasPrefix(prefix) {
+                let start = t.index(t.startIndex, offsetBy: prefix.count)
+                guard let q2 = t[start...].firstIndex(of: "\"") else { continue }
+                let name = String(t[start..<q2])
                 let parts = t[t.index(after: q2)...].split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-                if parts.count >= 2 { tests.append(("\(page): \(name)", parts[1])) }
+                if let sym = parts.dropLast().last, sym.hasPrefix("result_") { tests.append(("\(page): \(name)", sym)) }
             }
         }
         for _ in 0..<90 { nes.runFrame(input: []) }

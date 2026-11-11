@@ -93,7 +93,8 @@ final class PPU {
     func reset() {
         ctrl = 0; mask = 0; w = false; readBuffer = 0
         scanline = 261; dot = 0; oddFrame = false
-        nmiLine = false
+        nmiLine = false; nmiEdge = false; nmiRiseCountdown = 0; suppressVBlank = false; cancelNMI = false
+        status &= 0x7F
     }
 
     @inline(__always) var renderingEnabled: Bool { (mask & 0x18) != 0 }
@@ -488,7 +489,8 @@ final class PPU {
         s.bytes(ciram, count: 0x1000)
         s.bytes(palette, count: 32)
         s.sync(&scanline); s.sync(&dot); s.sync(&oddFrame); s.sync(&nmiLine); s.sync(&suppressVBlank); s.sync(&nmiEdge); s.sync(&nmiRiseCountdown)
-        s.sync(&a12High); s.sync(&a12LowSince); s.sync(&dotClock)
+        s.sync(&a12High); s.sync(&a12LowSince); s.sync(&dotClock); s.sync(&cancelNMI)
+        for i in 0..<8 { s.sync(&spA12[i]) }
         s.sync(&bgLo); s.sync(&bgHi); s.sync(&atLo); s.sync(&atHi)
         s.sync(&ntLatch); s.sync(&atLatch); s.sync(&patLo); s.sync(&patHi)
         s.sync(&spriteCount); s.sync(&spriteZeroOnLine)

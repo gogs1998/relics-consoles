@@ -57,11 +57,6 @@ public final class NESSystem: EmulatorCore {
         ppu.cart = cart
         ppu.mapper = mapper
         ppu.trackA12 = mapper is MMC3
-        apu.dmcRead = { [unowned self] addr in
-            let v = self.peek(addr)
-            self.openBus = v      // a DMA read drives the data bus like any other
-            return v
-        }
         reset()
     }
 
@@ -75,8 +70,11 @@ public final class NESSystem: EmulatorCore {
         s = s &- 3
         fI = true
         jammed = false
+        needNMI = false; prevNeedNMI = false; runIRQ = false; prevRunIRQ = false
+        apu.dmcFetchPending = false
         pc = UInt16(peek(0xFFFC)) | (UInt16(peek(0xFFFD)) << 8)
-        cycles = 7
+        cycles &+= 7     // keep counting so get/put parity stays tied to the APU's
+        for _ in 0..<7 { apu.evenCycle.toggle() }
     }
 
     // MARK: EmulatorCore
@@ -165,10 +163,14 @@ public final class NESSystem: EmulatorCore {
 
     @inline(__always)
     func read(_ addr: UInt16) -> UInt8 {
-        if apu.cpuStall > 0 {
-            let n = apu.cpuStall
-            apu.cpuStall = 0
-            for _ in 0..<n { tick() }
+        if apu.dmcFetchPending {
+            // DMC DMA: the CPU halts on this read, the DMA fetches the sample (driving the data
+            // bus), then the CPU's read happens.
+            apu.dmcFetchPending = false
+            tick(); tick(); tick()
+            let v = peek(apu.dmcAddress)
+            openBus = v
+            apu.deliverDMC(v)
         }
         tick()
         let v = busRead(addr)
