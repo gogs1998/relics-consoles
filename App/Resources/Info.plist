@@ -57,6 +57,7 @@
 				<string>com.iqlabs.duoemulator.md</string>
 				<string>com.iqlabs.duoemulator.gen</string>
 				<string>com.iqlabs.duoemulator.smd</string>
+				<string>com.iqlabs.duoemulator.nds</string>
 			</array>
 		</dict>
 	</array>
@@ -164,6 +165,16 @@
 			<array><string>public.data</string></array>
 			<key>UTTypeTagSpecification</key>
 			<dict><key>public.filename-extension</key><array><string>smd</string></array></dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.iqlabs.duoemulator.nds</string>
+			<key>UTTypeDescription</key>
+			<string>Nintendo DS game file</string>
+			<key>UTTypeConformsTo</key>
+			<array><string>public.data</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict><key>public.filename-extension</key><array><string>nds</string></array></dict>
 		</dict>
 	</array>
 	<key>UILaunchScreen</key>

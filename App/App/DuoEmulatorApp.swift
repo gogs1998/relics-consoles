@@ -83,6 +83,7 @@ struct RootView: View {
     /// DEBUG launch arguments for screenshots:
     ///   -autoplay demo.nes      open a bundled test cart (by file name) straight into the player
     ///   -holdInput right,a      hold buttons (as if on a keyboard) from launch
+    ///   -holdStylus 128,96      hold the stylus on the DS touch screen at that pixel from launch
     ///   -openMenu YES           open the pause menu after 2 s
     ///   -freshStart YES         ignore the auto-save
     private func debugAutoplay() {
@@ -93,9 +94,16 @@ struct RootView: View {
         play(game)
         if let hold = d.string(forKey: "holdInput"), let player {
             let map: [String: InputState] = ["up": .up, "down": .down, "left": .left, "right": .right,
-                                             "a": .a, "b": .b, "start": .start, "select": .select]
+                                             "a": .a, "b": .b, "x": .x, "y": .y, "l": .l, "r": .r,
+                                             "start": .start, "select": .select]
             let bits = hold.split(separator: ",").compactMap { map[String($0)] }.reduce(InputState()) { $0.union($1) }
             player.session.input.keyboard.store(bits.rawValue, ordering: .relaxed)
+        }
+        if let stylus = d.string(forKey: "holdStylus"), let player {
+            let xy = stylus.split(separator: ",").compactMap { Int($0) }
+            if xy.count == 2 {
+                player.session.input.stylus.store(InputLatch.stylus(x: xy[0], y: xy[1]), ordering: .relaxed)
+            }
         }
         if d.bool(forKey: "openMenu") {
             Task { @MainActor in

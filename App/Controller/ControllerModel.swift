@@ -222,7 +222,7 @@ struct ControlSettings: Codable, Hashable {
 /// Places the controls for each surface. Sizes come from the space actually available.
 ///
 /// Face buttons follow the system: two for NES and Game Boy (B A), two plus shoulders for GBA,
-/// a four-button diamond plus shoulders for SNES (Y X B A, in our own ember and sand, never the
+/// a four-button diamond plus shoulders for SNES and DS (Y X B A, in our own ember and sand, never the
 /// console's colours), and a row of three (A B C), or two rows of three when the six-button pad
 /// is chosen, for the Mega Drive.
 /// Built-in starting points for a layout.
@@ -241,7 +241,7 @@ enum LayoutPreset: String, Codable, CaseIterable, Identifiable {
 
 enum ControllerLayout {
     static func hasShoulders(_ system: SystemID, preset: LayoutPreset = .standard) -> Bool {
-        preset == .standard && (system == .gba || system == .snes)
+        preset == .standard && (system == .gba || system == .snes || system == .ds)
     }
 
     /// The arcade panel: two staggered, gently arched rows of three, plus a "whole row" zone at
@@ -282,7 +282,7 @@ enum ControllerLayout {
             return Control(kind: .face(s, label, tone), frame: CGRect(x: x - dd / 2, y: y - dd / 2, width: dd, height: dd))
         }
         switch system {
-        case .snes:
+        case .snes, .ds:
             let r = d * 0.78
             return [
                 button(.x, "X", .sand, c.x, c.y - r, scale: 0.86),
@@ -329,7 +329,7 @@ enum ControllerLayout {
         let usableH = h - shoulderSpace
         let unit = min(w / 2.6, usableH * 0.62)
         let dpad = unit * 0.92
-        let face = unit * (system == .snes || system == .md ? 0.36 : 0.40)
+        let face = unit * (system == .snes || system == .ds || system == .md ? 0.36 : 0.40)
         let midY = shoulderSpace + usableH * 0.50
         var c: [Control] = hasShoulders(system, preset: preset) ? shoulders(system, width: w, top: 4) : []
         c.append(Control(kind: .dpad, frame: CGRect(x: w * 0.23 - dpad / 2, y: midY - dpad / 2, width: dpad, height: dpad)))
@@ -337,7 +337,7 @@ enum ControllerLayout {
             let d = min(unit * 0.34, w * 0.11)
             c += arcadeCluster(system, centre: CGPoint(x: w * 0.74, y: midY + d * 0.25), diameter: d)
         } else {
-            let cx = system == .md ? w * 0.80 : (system == .snes ? w * 0.78 : w * 0.77)
+            let cx = system == .md ? w * 0.80 : (system == .snes || system == .ds ? w * 0.78 : w * 0.77)
             // The six-button pad's top row needs room above the cluster: push it down a little.
             let cy = system == .md && sixButton ? midY + face * 0.12 : midY
             c += faceCluster(system, centre: CGPoint(x: cx, y: cy), diameter: face, sixButton: sixButton)
@@ -396,7 +396,7 @@ enum ControllerLayout {
         let w = size.width, h = size.height
         let side = max(120, gameRect.minX)
         let dpad = min(side * 0.82, h * 0.42)
-        let face = dpad * (system == .snes || system == .md ? 0.36 : 0.42)
+        let face = dpad * (system == .snes || system == .ds || system == .md ? 0.36 : 0.42)
         var c: [Control] = []
         c.append(Control(kind: .dpad, frame: CGRect(x: side * 0.5 - dpad / 2, y: h * 0.58 - dpad / 2, width: dpad, height: dpad)))
         let rx = w - side * 0.5

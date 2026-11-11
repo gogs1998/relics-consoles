@@ -41,6 +41,10 @@ final class PlayerModel {
     private(set) var slotDates: [Int: Date] = [:]
     /// DEBUG: "samplesPulled peak" for the UI test.
     private(set) var audioStats = "0 0"
+    #if DEBUG
+    /// DEBUG: "touches x y" (stylus presses sent to the core, and the last point) for the UI test.
+    var stylusDebug = "0"
+    #endif
     /// Mega Drive: show the six-button pad (X Y Z, Mode) instead of the three-button one.
     var sixButtonPad = UserDefaults.standard.bool(forKey: "md.sixButton") {
         didSet { UserDefaults.standard.set(sixButtonPad, forKey: "md.sixButton") }
@@ -63,7 +67,8 @@ final class PlayerModel {
     init(game: GameRecord, store: GameStore) throws {
         self.game = game
         self.store = store
-        let rom = try Data(contentsOf: store.romURL(for: game))
+        // Mapped, not read: a DS cartridge can be hundreds of MB and the core keeps its own copy.
+        let rom = try Data(contentsOf: store.romURL(for: game), options: .mappedIfSafe)
         if rom.isEmpty { throw ImportError.unreadable(game.fileName) }
         gamepads = GamepadHub(system: game.system)
         let battery = try? Data(contentsOf: store.batteryURL(for: game))

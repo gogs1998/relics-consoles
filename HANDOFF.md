@@ -1,5 +1,44 @@
 # HANDOFF: Duo Emulator ("Foldback")
 
+## Update, 11 Nov 2026 (Nintendo DS: melonDS)
+- **Core:** melonDS commit `497aa6c` (GPL-3.0; the app is GPLv3 now) vendored byte-identical in
+  `Packages/CoreKit/Sources/MELONDS/melonds` (DS mode only; no frontend, DSi, network, OpenGL, JIT or GDB
+  sources). Built as the interpreter only: `JIT_ENABLED` never defined and no JIT file in the repo. No patches:
+  shims (`glue/shim`: non-JIT `ARMJIT*.h` via `unifdef`, `version.h`), DSi/SD-card stand-ins that abort if
+  ever reached (`glue/src/melonds_stubs.cpp`), and three build units that compile `ARM.cpp`, `NDS.cpp`,
+  `NDSCart.cpp` with `dynamic_cast` → `static_cast` (DSi-only downcasts). Details: `ThirdParty/melonds/README.md`.
+- **No Nintendo files:** FreeBIOS (BSD-2-Clause, Gilead Kutnick 2013, the DraStic BIOS, "not derived from
+  Nintendo's BIOS", source kept in `ThirdParty/melonds/freebios/`) + firmware generated in memory + direct boot.
+  The glue's melonDS file hooks all return "not found".
+- **Swift:** `DSCore.DSSystem`; protocol extended backwards-compatibly with `screens: [ScreenRegion]` and
+  `setTouch(_:)` (defaults for every other core). Framebuffer 256x384 (top over touch screen). `SystemID.ds`,
+  `.nds` + header (CRC-16) detection, import limit raised to 512 MB for DS (files are mapped, not read).
+- **App:** DS layouts in `App/Player/DSPlayerView.swift`. Table: top screen on the top half; touch screen centred
+  on the bottom half with controls in three new areas around it (`dsTableLeft/Right/Below`, so the editor can't
+  drag anything over it). Book: one screen per page, controls under each. Portrait: stacked, deck below.
+  Landscape: side by side, overlay controls in the margins (the stylus layer sits above them). Stylus input
+  only on the touch screen's rect (`DSTouchPad` → `InputLatch.stylus`). `-holdStylus x,y` DEBUG argument.
+- **Verified on the Mac (`swift test`, 83 tests pass, 7 DS):** boots our own `ds_demo.nds` (built by
+  `Tools/build_ds_roms.py`) with no BIOS files; both screens render; keys, X/Y and the stylus reach the game;
+  a 440 Hz PSG tone at 48 kHz; save-state round trip byte-identical (also via `StateContainer` and into a fresh
+  core); junk/truncated states rejected with the machine untouched; EEPROM battery save round trip and reset.
+  Speed of the interpreter on this Mac: **~570-590 fps in release** (~9.7x real time), ~540 in the debug test
+  build. Our cart busy-loops both CPUs and draws no 3D, so real 3D games will be much slower.
+- **Verified in the simulator** (Shared iPhone 17e, reused because two sims were booted): `DSUITests` (6)
+  pass: the table-pose tap on the touch screen arrives with the right coordinates, no control intersects it,
+  the layout editor moves a DS button and saves it; app unit tests incl. `DSLayoutTests` pass. Shots:
+  `docs/shots/table-ds.png`, `table-ds-stylus.png` (stylus held + A: touch screen green, square red),
+  `iphone-ds.png`, `iphone-landscape-ds.png`, `book-ds.png` (landscape).
+- **Needs Gordon's device:** iPhone speed (interpreter, no JIT; 3D-heavy games may not hold 60 fps on the
+  software renderer), audio quality, how the stylus feels and whether thumbs fit the narrow table-pose columns
+  on a real Duo, rewind (DS states are ~4.5 MB: one every 60 frames, ~5 s reach).
+- **Not done / open:** no commercial-style test (we can't download homebrew); DSi-enhanced games run in DS
+  mode, DSi-only ones are refused; no microphone, Wi-Fi or local multiplayer; RTC set from the clock at boot only;
+  the firmware's user name is melonDS's default; save type for unknown games is melonDS's guess (8 KB EEPROM)
+  unless the game is in melonDS's ROM list; the mandatory **Fable licence review of this core has not been run**.
+
+---
+
 ## Update, 11 Nov 2026 (phase 3: controls and controllers)
 Build 1 (b97a765) went to TestFlight via the coordinator. Since then:
 - **Research:** `docs/controls-research.md` (Delta, RetroArch, Provenance, Gamma, Folium, PPSSPP, Lemuroid,

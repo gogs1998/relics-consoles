@@ -89,7 +89,7 @@ public struct ControllerMapping: Codable, Hashable, Sendable {
     /// Positional defaults (face buttons by position, not by printed letter):
     /// - NES, GB, GBC: south (buttonA) = B, east (buttonB) = A, like the original pads' layout.
     /// - GBA: as above, shoulders = L / R.
-    /// - SNES: south = B, east = A, west (buttonX) = Y, north (buttonY) = X, shoulders = L / R.
+    /// - SNES and DS: south = B, east = A, west (buttonX) = Y, north (buttonY) = X, shoulders = L / R.
     /// - Mega Drive 6-button: the three main buttons on the three easiest face buttons, west/south/east
     ///   = A/B/C (left to right, as on the pad's bottom row); the top row X/Y/Z on left shoulder /
     ///   north / right shoulder. In InputState terms (AresCore's MD mapping): A = .y, B = .b, C = .a,
@@ -109,7 +109,7 @@ public struct ControllerMapping: Codable, Hashable, Sendable {
         case .gba:
             b[.buttonA] = .b; b[.buttonB] = .a
             b[.leftShoulder] = .l; b[.rightShoulder] = .r
-        case .snes:
+        case .snes, .ds:
             b[.buttonA] = .b; b[.buttonB] = .a; b[.buttonX] = .y; b[.buttonY] = .x
             b[.leftShoulder] = .l; b[.rightShoulder] = .r
         case .md:
@@ -179,7 +179,7 @@ public struct KeyboardMapping: Codable, Hashable, Sendable {
     /// Defaults: arrow keys = directions, Return = Start, right Shift = Select (Mode).
     /// Face buttons on the left hand, laid out like the pad:
     /// - NES, GB, GBC: Z = B, X = A.  GBA: plus Q / E = L / R.
-    /// - SNES: Z = B, X = A, A = Y, S = X, Q / E = L / R.
+    /// - SNES and DS: Z = B, X = A, A = Y, S = X, Q / E = L / R.
     /// - Mega Drive: Z X C = A B C, A S D = X Y Z (bottom and top rows).
     /// WASD is not a direction cluster by default: A and S (and D on the Mega Drive) are face buttons.
     /// Hotkeys: F1 save state, F4 load state, Tab fast-forward, Backspace rewind, Escape menu.
@@ -193,7 +193,7 @@ public struct KeyboardMapping: Codable, Hashable, Sendable {
             b[KeyCode.z] = .b; b[KeyCode.x] = .a
         case .gba:
             b[KeyCode.z] = .b; b[KeyCode.x] = .a; b[KeyCode.q] = .l; b[KeyCode.e] = .r
-        case .snes:
+        case .snes, .ds:
             b[KeyCode.z] = .b; b[KeyCode.x] = .a; b[KeyCode.a] = .y; b[KeyCode.s] = .x
             b[KeyCode.q] = .l; b[KeyCode.e] = .r
         case .md:

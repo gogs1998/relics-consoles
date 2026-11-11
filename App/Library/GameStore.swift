@@ -105,6 +105,7 @@ final class GameStore {
         case .gba: "Game Boy Advance"
         case .snes: "SNES"
         case .md: "Mega Drive"
+        case .ds: "Nintendo DS"
         }
     }
 
@@ -162,10 +163,11 @@ final class GameStore {
 
     private func importOne(_ url: URL) throws -> Bool {
         let name = url.lastPathComponent
-        guard let data = try? Data(contentsOf: url) else { throw ImportError.unreadable(name) }
-        // Largest real cartridges: 32 MB (GBA), 8 MB (SNES), a few MB for the rest.
-        guard data.count >= 16, data.count <= 32 * 1024 * 1024,
-              let system = CoreFactory.detect(rom: data, fileExtension: url.pathExtension) else {
+        guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else { throw ImportError.unreadable(name) }
+        // Largest real cartridges: 512 MB (DS), 32 MB (GBA), 8 MB (SNES), a few MB for the rest.
+        guard data.count >= 16, data.count <= 512 * 1024 * 1024,
+              let system = CoreFactory.detect(rom: data, fileExtension: url.pathExtension),
+              system == .ds || data.count <= 32 * 1024 * 1024 else {
             throw ImportError.notAGame(name)
         }
         let id = Insecure.SHA1.hash(data: data).map { String(format: "%02x", $0) }.joined()
@@ -262,7 +264,7 @@ final class GameStore {
             "mmc1_probe.nes": "Test Cart: MMC1 Probe", "uxrom_probe.nes": "Test Cart: UxROM Probe",
             "cnrom_probe.nes": "Test Cart: CNROM Probe", "mmc3_probe.nes": "Test Cart: MMC3 Probe",
             "gba_demo.gba": "Test Cart: Advance Square", "ares_snes_demo.sfc": "Test Cart: Sixteen Blue",
-            "ares_md_demo.md": "Test Cart: Mega Tone",
+            "ares_md_demo.md": "Test Cart: Mega Tone", "ds_demo.nds": "Test Cart: Double Screen",
         ]
         for url in files.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
             guard let data = try? Data(contentsOf: url),

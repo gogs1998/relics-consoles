@@ -212,7 +212,7 @@ struct ControllersSheet: View {
         switch system {
         case .nes, .gb, .gbc: list += [(.a, "A"), (.b, "B")]
         case .gba: list += [(.a, "A"), (.b, "B"), (.l, "L"), (.r, "R")]
-        case .snes: list += [(.a, "A"), (.b, "B"), (.x, "X"), (.y, "Y"), (.l, "L"), (.r, "R")]
+        case .snes, .ds: list += [(.a, "A"), (.b, "B"), (.x, "X"), (.y, "Y"), (.l, "L"), (.r, "R")]
         case .md: list += [(.y, "A"), (.b, "B"), (.a, "C"), (.x, "X"), (.l, "Y"), (.r, "Z")]
         }
         list += [(.start, "Start"), (.select, system == .md ? "Mode" : "Select")]

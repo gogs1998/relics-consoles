@@ -13,11 +13,11 @@ struct PlayerView: View {
     @State var model: PlayerModel
     let stage: DuoStage
     var onQuit: () -> Void
-    @Environment(\.displayScale) private var displayScale
+    @Environment(\.displayScale) var displayScale
 
-    private enum Arrangement { case table, book, portrait, landscape }
+    enum Arrangement { case table, book, portrait, landscape }
 
-    private var arrangement: Arrangement {
+    var arrangement: Arrangement {
         if stage.fold.isActive && !stage.fold.frame.isEmpty {
             return stage.fold.axis == .horizontal ? .table : .book
         }
@@ -29,6 +29,8 @@ struct PlayerView: View {
             BodySurface()
             if let error = model.errorMessage {
                 errorView(error)
+            } else if model.game.system == .ds {
+                dsLayout   // two screens (DSPlayerView.swift)
             } else {
                 switch arrangement {
                 case .table: tableLayout
@@ -41,7 +43,10 @@ struct PlayerView: View {
         .frame(width: stage.bounds.width, height: stage.bounds.height)
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
-        .onChange(of: arrangement) { _, _ in model.controller.releaseAll() }
+        .onChange(of: arrangement) { _, _ in
+            model.controller.releaseAll()
+            model.session.input.stylus.store(0, ordering: .relaxed)
+        }
         .onChange(of: model.physicalMode) { _, physical in
             // The touch layout's auto-fire buttons don't carry over to a physical controller.
             if physical {
@@ -67,6 +72,14 @@ struct PlayerView: View {
                 .opacity(0.01)
                 .accessibilityIdentifier("debug.touchInput")
                 .accessibilityValue("\(model.controller.everPressed.rawValue)")
+                .allowsHitTesting(false)
+        }
+        .overlay(alignment: .bottomLeading) {
+            Text("stylus \(model.stylusDebug)")
+                .font(.caption2)
+                .opacity(0.01)
+                .accessibilityIdentifier("debug.stylus")
+                .accessibilityValue(model.stylusDebug)
                 .allowsHitTesting(false)
         }
         #endif
@@ -210,7 +223,7 @@ struct PlayerView: View {
     /// The touch controller for one area: the saved layout (game, then system), or the preset's
     /// defaults; in edit mode, the editor for that area instead.
     @ViewBuilder
-    private func controllerArea(_ area: ControllerArea, rect: CGRect,
+    func controllerArea(_ area: ControllerArea, rect: CGRect,
                                 defaults: @escaping (LayoutPreset) -> [Control]) -> some View {
         if let editor = model.editor {
             LayoutEditorArea(editor: editor, model: model.controller, area: area, size: rect.size, defaults: defaults)
@@ -222,7 +235,7 @@ struct PlayerView: View {
         }
     }
 
-    private var editorPanel: some View {
+    var editorPanel: some View {
         Group {
             if let editor = model.editor {
                 ScrollView {
@@ -234,7 +247,7 @@ struct PlayerView: View {
         }
     }
 
-    @ViewBuilder private var toastView: some View {
+    @ViewBuilder var toastView: some View {
         if let toast = model.toast {
             Text(toast)
                 .font(.rounded(.footnote, weight: .semibold))
@@ -249,7 +262,7 @@ struct PlayerView: View {
         }
     }
 
-    private var menuPanel: some View {
+    var menuPanel: some View {
         PlayerMenu(model: model, onQuit: onQuit)
             .transition(.scale(scale: 0.96).combined(with: .opacity))
     }

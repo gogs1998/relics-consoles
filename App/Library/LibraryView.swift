@@ -64,7 +64,7 @@ struct LibraryView: View {
     }
 
     static var importTypes: [UTType] {
-        let ids = ["nes", "gb", "gbc", "gba", "sfc", "smc", "md", "gen", "smd"].map { "com.iqlabs.duoemulator.\($0)" }
+        let ids = ["nes", "gb", "gbc", "gba", "sfc", "smc", "md", "gen", "smd", "nds"].map { "com.iqlabs.duoemulator.\($0)" }
         return ids.compactMap { UTType($0) } + [.data]
     }
 

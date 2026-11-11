@@ -7,6 +7,12 @@ import UniformTypeIdentifiers
 /// The surfaces a layout can be made for. Book pose has two (one per page).
 enum ControllerArea: String, Codable, CaseIterable, Identifiable {
     case table, portrait, bookLeft, bookRight, landscape
+    /// DS in Duo table pose: the touch screen sits in the middle of the bottom half, so its
+    /// controls live in three areas around it (they can never be dragged over the screen).
+    case dsTableLeft, dsTableRight, dsTableBelow
+
+    /// Areas that share one layout's settings with a main area (the editor reads the main one's).
+    var isSecondary: Bool { self == .bookLeft || self == .dsTableLeft || self == .dsTableBelow }
 
     var id: String { rawValue }
 
@@ -17,6 +23,9 @@ enum ControllerArea: String, Codable, CaseIterable, Identifiable {
         case .bookLeft: "Duo book, left page"
         case .bookRight: "Duo book, right page"
         case .landscape: "Landscape"
+        case .dsTableLeft: "Duo table, left of the touch screen"
+        case .dsTableRight: "Duo table, right of the touch screen"
+        case .dsTableBelow: "Duo table, below the touch screen"
         }
     }
 }

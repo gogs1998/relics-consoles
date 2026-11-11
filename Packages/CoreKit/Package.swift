@@ -49,6 +49,23 @@ let aresC: [CSetting] = [
     .unsafeFlags(["-O2", "-w"]),
 ]
 
+// melonDS (GPL-3.0-or-later), Nintendo DS mode only, vendored unmodified in Sources/MELONDS/melonds
+// (see ThirdParty/melonds/README.md). Interpreter only: JIT_ENABLED is never defined and no JIT file is
+// vendored (glue/shim holds the non-JIT stand-ins for ARMJIT.h / ARMJIT_Memory.h and the generated
+// version.h). No DSi, Wi-Fi networking, OpenGL or GDB stub sources; glue/src/melonds_stubs.cpp stands
+// in for the DSi/SD-card classes the NDS code names but never reaches in DS mode.
+// Built through glue/units instead (see there), plus the licence and template files.
+let melondsExcluded = ["melonds/ARM.cpp", "melonds/NDS.cpp", "melonds/NDSCart.cpp", "melonds/LICENSE",
+                       "melonds/version.h.in", "melonds/blip-buf/license.txt", "melonds/blip-buf/readme.txt",
+                       "melonds/fatfs/LICENSE.txt", "melonds/tiny-AES-c/unlicense.txt"]
+let melondsPaths: [String] = ["glue/shim", "glue/include", "melonds"]
+let melondsCXX: [CXXSetting] = melondsPaths.map { .headerSearchPath($0) } + [
+    .define("NDEBUG"),
+    // Optimised even in Debug (like the other cores); upstream's own warnings are not ours to fix.
+    .unsafeFlags(["-O2", "-w", "-fwrapv", "-Wno-invalid-offsetof"]),
+]
+let melondsC: [CSetting] = [.define("NDEBUG"), .unsafeFlags(["-O2", "-w", "-fwrapv"])]
+
 let package = Package(
     name: "CoreKit",
     platforms: [.iOS("26.0"), .macOS("26.0")],
@@ -56,6 +73,7 @@ let package = Package(
         .library(name: "CoreKit", targets: ["CoreKit", "NESCore", "GBCore", "GBACore"]),
         // Separate product so the app opts in when it wires the new systems up.
         .library(name: "AresCore", targets: ["AresCore"]),
+        .library(name: "DSCore", targets: ["DSCore"]),
     ],
     targets: [
         .target(name: "CoreKit", swiftSettings: fast),
@@ -66,7 +84,12 @@ let package = Package(
         .target(name: "ARES", sources: ["glue/units", "glue/src"], publicHeadersPath: "glue/include",
                 cSettings: aresC, cxxSettings: aresCXX),
         .target(name: "AresCore", dependencies: ["CoreKit", "ARES"], swiftSettings: fast),
-        .testTarget(name: "CoreKitTests", dependencies: ["CoreKit", "NESCore", "GBCore", "GBACore", "AresCore"]),
+        .target(name: "MELONDS", exclude: melondsExcluded,
+                sources: ["melonds", "glue/src", "glue/units"], publicHeadersPath: "glue/include",
+                cSettings: melondsC, cxxSettings: melondsCXX),
+        .target(name: "DSCore", dependencies: ["CoreKit", "MELONDS"], swiftSettings: fast),
+        .testTarget(name: "CoreKitTests",
+                    dependencies: ["CoreKit", "NESCore", "GBCore", "GBACore", "AresCore", "DSCore"]),
     ],
     cxxLanguageStandard: .cxx20
 )

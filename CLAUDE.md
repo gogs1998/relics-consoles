@@ -17,7 +17,8 @@ Fable review changes in §10) and `docs/research.md` (App Store 4.7, core licens
   NES and GB/GBC cores are ours; GBA is mGBA
   (MPL-2.0, vendored unmodified in `Packages/CoreKit/Sources/MGBA/mgba`, any change must go in
   `ThirdParty/mgba/patches/` and be published); SNES and Mega Drive are ares (ISC, vendored unmodified in
-  `Sources/ARES/ares`, our stand-ins in `glue/shim`). Licence texts: `Licenses/` (repo) and
+  `Sources/ARES/ares`, our stand-ins in `glue/shim`); DS is melonDS (GPL-3.0, vendored unmodified in
+  `Sources/MELONDS/melonds`, shims/stubs/build units in `glue`, patches would go in `ThirdParty/melonds/patches/`). Licence texts: `Licenses/` (repo) and
   `App/Resources/Licences/` (shown in About). Keep both in sync when a component is added.
 - **Core plan:** N64 (mupen64plus + GLideN64 + rsp-hle) and DS (melonDS, own FreeBIOS) first, then PS1
   (PCSX-ReARMed, HLE BIOS), PSP (PPSSPP, no JIT), then small systems (Mednafen, Stella). GameCube/Wii is a
@@ -36,14 +37,16 @@ Fable review changes in §10) and `docs/research.md` (App Store 4.7, core licens
 - Xcode 27.1, iOS 27.1 SDK, deployment iOS 26.0, Swift 6 strict concurrency, SwiftUI, Metal.
 - XcodeGen: `project.yml`. Never hand-edit `DuoEmulator.xcodeproj` (gitignored): `xcodegen generate`.
 - DuoKit `github.com/gogs1998/iqlabs-duokit` from 0.1.2 (don't fork; gaps go in `docs/DUOKIT-GAPS.md`).
-- CoreKit: local package `Packages/CoreKit` (targets CoreKit, NESCore, GBCore, MGBA + GBACore, ARES + AresCore;
+- CoreKit: local package `Packages/CoreKit` (targets CoreKit, NESCore, GBCore, MGBA + GBACore, ARES + AresCore,
+  MELONDS + DSCore;
   Swift cores build `-Ounchecked -enforce-exclusivity=unchecked`, C/C++ at -O2, even in Debug).
   ares keeps one console in process globals: one SNES/MD core per process (EmulatorSession's `coreGate`).
   Tests run on the Mac:
   `cd Packages/CoreKit && swift test --scratch-path ../../build/corekit`
 - Test ROMs: `python3 Tools/build_test_roms.py` (NES, own 6502 assembler `Tools/asm6502.py`, art in
   `Tools/chrart.py`), `python3 Tools/build_gb_roms.py` (GB, `Tools/asm_sm83.py`), `Tools/build_gba_roms.py`,
-  `Tools/build_ares_roms.py` (SNES + MD, hand-assembled).
+  `Tools/build_ares_roms.py` (SNES + MD, hand-assembled), `Tools/build_ds_roms.py` (DS cart: ARM9 + ARM7 code via the
+  ARM encoder in `build_gba_roms.py`, logo area zero).
 - Accuracy suites (approved, gitignored, never bundled) in `TestSuites/`; harness and how to run: `docs/accuracy.md`.
 - Our test-ROM outputs in `TestROMs/build/` are committed. A Debug-only build phase copies them into the app as `TestCarts/`;
   Release strips them and fails the build if any ROM file is in the bundle.
@@ -71,6 +74,13 @@ Fable review changes in §10) and `docs/research.md` (App Store 4.7, core licens
   bank tables) + mappers 0, 1, 2, 3, 4, 7. Palette generated from a YIQ model (ours).
 - `GBCore` (helper-built, Fable-reviewed): `GBSystem` (SM83, timer, DMA/HDMA, double speed), `PPU`, `APU`,
   `Cartridge` (MBC1/2/3/5).
+- Multi-screen systems: `EmulatorCore.screens` (`ScreenRegion`s inside the framebuffer, `isTouch`) and
+  `setTouch(TouchPoint?)`, both defaulted for one-screen cores. `DSCore`: `DSSystem` over `Sources/MELONDS/glue`
+  (C API `MelonDSGlue.h`; melonDS Platform hooks with no file/network access; FreeBIOS + generated firmware +
+  direct boot; interpreter, JIT never compiled; software renderer, 3D threaded). Framebuffer 256x384 (top
+  screen over touch screen); mono 48 kHz from melonDS's own resampler (the Decimator only downsamples);
+  savestates are melonDS's (~4.5 MB); battery = cartridge save memory (nil until the game writes it).
+  DSi mode, Wi-Fi networking, OpenGL, GDB stub are not vendored (`ThirdParty/melonds/README.md`).
 - App (`App/`): `RootView` (DuoStageReader → Library or Player), `GameStore` (Documents/Games|Saves|States,
   `.library.json`, Inbox scan, import with header detection), `EmulatorSession` (dedicated thread owns the
   core, built on that thread; commands via Mutex; self-paced with ±0.5 % dynamic rate control from the audio
@@ -79,11 +89,15 @@ Fable review changes in §10) and `docs/research.md` (App Store 4.7, core licens
   `ScreenFit` picks integer scaling in device pixels when it fills ≥ 85 %), `AudioOutput` (AVAudioSourceNode
   built in a `nonisolated static` helper), `GamepadHub` (GCController + GCKeyboard), `ControllerModel` +
   `TouchSurface` (UIKit multi-touch, per-touch ownership) + `ControllerView` (the Graphite and Ember
-  controller drawing), `PlayerView` (table / book / portrait / landscape arrangements), `PlayerMenu`,
+  controller drawing), `PlayerView` (table / book / portrait / landscape arrangements; DS ones in
+  `DSPlayerView`: `GameScreen(crop:)` per screen, `DSTouchPad` only on the touch screen's rect →
+  `InputLatch.stylus`; DS table controls in areas `dsTableLeft/Right/Below` around the touch screen,
+  defaults in `DSLayouts.swift`), `PlayerMenu`,
   `LibraryView` (+ `GameCard`, generated labels).
 
 ## DEBUG launch arguments
 `-pose table|book|flat`, `-autoplay demo.nes` (a bundled test cart by file name), `-holdInput right,a`,
+`-holdStylus 128,96` (DS stylus held at that touch-screen pixel),
 `-openMenu YES`, `-freshStart YES` (ignore the auto-save), `-resetLayouts YES` (built-in touch layouts),
 `-keepTouchControls YES` (the simulator may expose a virtual "Gamepad", which hides the touch controller),
 `-fakeController YES` (pretend a pad is connected).

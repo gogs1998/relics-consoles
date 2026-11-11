@@ -18,6 +18,12 @@ struct AboutView: View {
         Licence(id: "ares", title: "ares", detail: "SNES and Mega Drive cores · ISC, with MAME-derived parts under BSD 3-Clause · commit 0b92893, github.com/ares-emulator/ares",
                 file: "Licence-ares-ISC-and-bundled"),
         Licence(id: "qon", title: "qon", detail: "Part of ares · MIT", file: "Licence-qon-MIT"),
+        Licence(id: "melonds", title: "melonDS", detail: "Nintendo DS core · GPL-3.0-or-later · an unmodified copy of commit 497aa6c; its source is at github.com/melonDS-emu/melonDS/tree/497aa6c",
+                file: "Licence-melonDS-GPL-3.0"),
+        Licence(id: "freebios", title: "FreeBIOS", detail: "Part of melonDS · the DS BIOS replacement by Gilead Kutnick (no Nintendo code) · BSD 2-Clause",
+                file: "Licence-FreeBIOS-BSD-2-Clause"),
+        Licence(id: "melonds-bundled", title: "xxHash, FatFs, tiny-AES-c, blip_buf", detail: "Parts of melonDS · BSD 2-Clause, FatFs, Unlicense, LGPL-2.1",
+                file: "Licence-melonDS-bundled"),
     ]
 
     var body: some View {

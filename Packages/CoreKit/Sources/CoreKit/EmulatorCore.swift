@@ -8,6 +8,7 @@ public enum SystemID: String, Codable, Sendable, CaseIterable, Identifiable {
     case gba
     case snes
     case md
+    case ds
 
     public var id: String { rawValue }
 
@@ -20,6 +21,7 @@ public enum SystemID: String, Codable, Sendable, CaseIterable, Identifiable {
         case .gba: "Game Boy Advance"
         case .snes: "SNES"
         case .md: "Mega Drive / Genesis"
+        case .ds: "Nintendo DS"
         }
     }
 
@@ -31,6 +33,7 @@ public enum SystemID: String, Codable, Sendable, CaseIterable, Identifiable {
         case .gba: ["gba"]
         case .snes: ["sfc", "smc"]
         case .md: ["md", "gen", "bin", "smd"]
+        case .ds: ["nds"]
         }
     }
 
@@ -71,6 +74,26 @@ public struct VideoSize: Sendable, Equatable, Hashable {
     public var width: Int
     public var height: Int
     public init(width: Int, height: Int) { self.width = width; self.height = height }
+}
+
+/// One physical screen inside a core's framebuffer (most systems have one covering the whole frame).
+public struct ScreenRegion: Sendable, Equatable, Hashable {
+    public var x: Int
+    public var y: Int
+    public var width: Int
+    public var height: Int
+    /// The player can touch this screen (the DS's lower screen).
+    public var isTouch: Bool
+    public init(x: Int, y: Int, width: Int, height: Int, isTouch: Bool = false) {
+        self.x = x; self.y = y; self.width = width; self.height = height; self.isTouch = isTouch
+    }
+}
+
+/// A stylus position on a touch screen, in that screen's own pixels (0..<width, 0..<height).
+public struct TouchPoint: Sendable, Equatable, Hashable {
+    public var x: Int
+    public var y: Int
+    public init(x: Int, y: Int) { self.x = x; self.y = y }
 }
 
 public enum CoreError: Error, LocalizedError, Equatable {
@@ -121,11 +144,22 @@ public protocol EmulatorCore: AnyObject {
     var batteryRAM: Data? { get }
     func saveState() -> Data
     func loadState(_ data: Data) throws
+
+    /// The physical screens inside `framebuffer`, in display order (top screen first).
+    /// Defaults to one screen covering the whole frame.
+    var screens: [ScreenRegion] { get }
+    /// Sets (or lifts, with nil) the stylus on the touch screen for the following frames.
+    /// Ignored by cores without one.
+    func setTouch(_ point: TouchPoint?)
 }
 
 public extension EmulatorCore {
     var maxPlayers: Int { 1 }
     func runFrame(inputs: [InputState]) { runFrame(input: inputs.first ?? []) }
+    var screens: [ScreenRegion] { [ScreenRegion(x: 0, y: 0, width: videoSize.width, height: videoSize.height)] }
+    func setTouch(_ point: TouchPoint?) {}
+    /// The touch screen, if the system has one.
+    var touchScreen: ScreenRegion? { screens.first { $0.isTouch } }
 }
 
 /// Identifies a file's system. (Building the core is the app's job: it imports each core module.)
@@ -136,6 +170,7 @@ public enum CoreFactory {
            rom[rom.startIndex + 2] == 0x53, rom[rom.startIndex + 3] == 0x1A {
             return .nes
         }
+        if dsHeaderValid(rom) { return .ds }
         if rom.count >= 0xC0 {
             // Game Boy Advance header: a branch at 0 (byte 3 = $EA), the fixed $96 at $B2 and a
             // valid complement check at $BD. Checked before the GB header, which a GBA ROM can pass by chance.
@@ -169,8 +204,32 @@ public enum CoreFactory {
         case "sfc", "smc": return .snes
         // ".bin" is ambiguous (many systems use it): only claimed above, by the "SEGA" header.
         case "md", "gen", "smd": return .md
+        case "nds": return .ds
         default: return nil
         }
+    }
+
+    /// Nintendo DS cartridge header: ARM9 and ARM7 binaries (offset >= 0x200, non-empty) inside the
+    /// file, plausible load addresses and a correct header CRC-16 at 0x15E.
+    static func dsHeaderValid(_ rom: Data) -> Bool {
+        guard rom.count >= 0x1000 else { return false }
+        let b = rom.startIndex
+        func u32(_ o: Int) -> UInt32 {
+            UInt32(rom[b + o]) | UInt32(rom[b + o + 1]) << 8 | UInt32(rom[b + o + 2]) << 16 | UInt32(rom[b + o + 3]) << 24
+        }
+        let arm9Off = u32(0x20), arm9RAM = u32(0x28), arm9Size = u32(0x2C)
+        let arm7Off = u32(0x30), arm7RAM = u32(0x38), arm7Size = u32(0x3C)
+        guard arm9Off >= 0x200, arm7Off >= 0x200, arm9Size > 0, arm7Size > 0,
+              UInt64(arm9Off) + UInt64(arm9Size) <= UInt64(rom.count),
+              UInt64(arm7Off) + UInt64(arm7Size) <= UInt64(rom.count),
+              (0x0200_0000..<0x0300_0000).contains(arm9RAM),
+              (0x0200_0000..<0x0400_0000).contains(arm7RAM) else { return false }
+        var crc: UInt16 = 0xFFFF
+        for i in 0..<0x15E {
+            crc ^= UInt16(rom[b + i])
+            for _ in 0..<8 { crc = (crc & 1) != 0 ? (crc >> 1) ^ 0xA001 : crc >> 1 }
+        }
+        return crc == UInt16(rom[b + 0x15E]) | UInt16(rom[b + 0x15F]) << 8
     }
 
     /// SNES internal header: checksum + complement == $FFFF at $7FDC (LoROM) or $FFDC (HiROM),

@@ -45,7 +45,7 @@ final class LayoutEditor {
         sizes[area] = size
         let r = store.controls(system, area, game: gameID, size: size, defaults: make)
         controls[area] = r.controls
-        if area != .bookLeft {   // book pose: both pages share one layout's settings; take the right page's
+        if !area.isSecondary {   // book pose / DS table: the areas share one layout's settings; take the main one's
             settings = r.settings
             preset = r.preset
         }

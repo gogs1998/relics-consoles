@@ -1,3 +1,4 @@
+import CoreKit
 import MetalKit
 import SwiftUI
 
@@ -57,6 +58,8 @@ struct GameScreen: UIViewRepresentable {
     let frames: FrameExchange
     var mode: ScreenMode
     var integer: Bool
+    /// Show only this part of the frame (one of a multi-screen system's screens); nil = all of it.
+    var crop: ScreenRegion?
 
     func makeCoordinator() -> Renderer { Renderer(frames: frames) }
 
@@ -70,12 +73,12 @@ struct GameScreen: UIViewRepresentable {
         view.framebufferOnly = true
         view.isAccessibilityElement = true
         view.accessibilityLabel = "Game screen"
-        context.coordinator.update(mode: mode, integer: integer)
+        context.coordinator.update(mode: mode, integer: integer, crop: crop)
         return view
     }
 
     func updateUIView(_ view: MTKView, context: Context) {
-        context.coordinator.update(mode: mode, integer: integer)
+        context.coordinator.update(mode: mode, integer: integer, crop: crop)
     }
 
     @MainActor
@@ -87,6 +90,7 @@ struct GameScreen: UIViewRepresentable {
         private let frames: FrameExchange
         private var lastSequence: UInt64 = .max
         private var shaderMode: Int32 = 0
+        private var crop: ScreenRegion?
 
         init(frames: FrameExchange) {
             self.frames = frames
@@ -102,7 +106,11 @@ struct GameScreen: UIViewRepresentable {
             }
         }
 
-        func update(mode: ScreenMode, integer: Bool) {
+        func update(mode: ScreenMode, integer: Bool, crop newCrop: ScreenRegion?) {
+            if newCrop != crop {
+                crop = newCrop
+                lastSequence = .max   // re-upload the current frame with the new crop
+            }
             switch mode {
             case .scanlines: shaderMode = 2
             case .lcd: shaderMode = 3
@@ -115,7 +123,15 @@ struct GameScreen: UIViewRepresentable {
         func draw(in view: MTKView) {
             guard let device, let queue, let pipeline else { return }
             var tex = texture
-            lastSequence = frames.withFrame(newerThan: lastSequence) { pixels, w, h in
+            let crop = crop
+            lastSequence = frames.withFrame(newerThan: lastSequence) { framePixels, frameW, frameH in
+                var pixels = framePixels, w = frameW, h = frameH
+                if let crop, crop.x >= 0, crop.y >= 0, crop.width > 0, crop.height > 0,
+                   crop.x + crop.width <= frameW, crop.y + crop.height <= frameH {
+                    pixels = framePixels + crop.y * frameW + crop.x
+                    w = crop.width
+                    h = crop.height
+                }
                 if tex == nil || tex!.width != w || tex!.height != h {
                     let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: w, height: h,
                                                                      mipmapped: false)
@@ -124,7 +140,7 @@ struct GameScreen: UIViewRepresentable {
                     tex = device.makeTexture(descriptor: d)
                 }
                 tex?.replace(region: MTLRegionMake2D(0, 0, w, h), mipmapLevel: 0, withBytes: pixels,
-                             bytesPerRow: w * 4)
+                             bytesPerRow: frameW * 4)
             }
             texture = tex
             guard let texture, let pass = view.currentRenderPassDescriptor, let drawable = view.currentDrawable,

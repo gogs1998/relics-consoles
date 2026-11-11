@@ -1,5 +1,6 @@
 import AresCore
 import CoreKit
+import DSCore
 import Foundation
 import GBACore
 import GBCore
@@ -66,6 +67,18 @@ final class InputLatch: Sendable {
     /// Buttons that auto-fire while held, and the half-period in frames.
     let autoFire = Atomic<UInt32>(0)
     let autoFireHalfPeriod = Atomic<Int>(3)
+    /// The stylus on a touch screen (DS): `Self.stylus(x:y:)` while down, 0 when lifted.
+    let stylus = Atomic<UInt32>(0)
+
+    static func stylus(x: Int, y: Int) -> UInt32 {
+        1 << 31 | UInt32(min(max(y, 0), 0x7FFF)) << 16 | UInt32(min(max(x, 0), 0xFFFF))
+    }
+
+    var stylusPoint: TouchPoint? {
+        let v = stylus.load(ordering: .relaxed)
+        guard v & (1 << 31) != 0 else { return nil }
+        return TouchPoint(x: Int(v & 0xFFFF), y: Int((v >> 16) & 0x7FFF))
+    }
 
     var current: InputState {
         InputState(rawValue: touch.load(ordering: .relaxed) | controller.load(ordering: .relaxed)
@@ -142,6 +155,7 @@ final class EmulatorSession: @unchecked Sendable {
         case .gba: return try GBASystem(rom: rom, battery: battery)
         case .snes: return try SNESSystem(rom: rom, battery: battery)
         case .md: return try MDSystem(rom: rom, battery: battery)
+        case .ds: return try DSSystem(rom: rom, battery: battery)
         }
     }
 
@@ -172,6 +186,7 @@ final class EmulatorSession: @unchecked Sendable {
         onStarted?(core.videoSize.width, core.videoSize.height, Self.romCRC(core, rom: rom), core.stateVersion, core.maxPlayers)
 
         var lastSize = core.videoSize
+        let hasTouch = core.touchScreen != nil
         let basePeriod = 1.0 / core.frameRate
         let targetFill = Double(core.audioSampleRate) * basePeriod * 3   // ~3 frames of audio queued
         var next = ProcessInfo.processInfo.systemUptime
@@ -234,6 +249,7 @@ final class EmulatorSession: @unchecked Sendable {
                     if (frameCount / half) % 2 == 1 { held.subtract(fire) }
                 }
                 let p2 = InputState(rawValue: input.player2.load(ordering: .relaxed)).sanitised
+                if hasTouch { core.setTouch(input.stylusPoint) }
                 for i in 0..<speed {
                     if core.maxPlayers > 1 { core.runFrame(inputs: [held, p2]) } else { core.runFrame(input: held) }
                     frameCount += 1
@@ -265,11 +281,13 @@ final class EmulatorSession: @unchecked Sendable {
 
     private func discardAudio(_ core: any EmulatorCore) { core.discardAudio() }
 
-    /// Big states (GBA ~400 KB) are snapshotted less often so rewind still reaches ~15 s back.
+    /// Big states are snapshotted less often: GBA (~400 KB) every 15 frames, so rewind still
+    /// reaches ~15 s back; DS (~4.5 MB, mostly main RAM) every 60, which reaches ~5 s back.
     private var rewindInterval = 4
 
     private func pushRewind(_ state: Data) {
         if state.count > 100_000 { rewindInterval = 15 }
+        if state.count > 2_000_000 { rewindInterval = 60 }
         rewindStates.append(state)
         rewindBytes += state.count
         while rewindBytes > rewindCap, !rewindStates.isEmpty {
