@@ -55,12 +55,28 @@ targets:
       configs:
         Debug:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+  DuoEmulatorUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: DuoEmulator
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.iqlabs.duoemulator.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1,2"
+        TEST_TARGET_NAME: DuoEmulator
 schemes:
   DuoEmulator:
     build:
       targets:
         DuoEmulator: all
+        DuoEmulatorUITests: [test]
     run:
       config: Debug
+    test:
+      config: Debug
+      targets: [DuoEmulatorUITests]
     archive:
       config: Release

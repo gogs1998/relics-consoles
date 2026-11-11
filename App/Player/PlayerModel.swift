@@ -23,6 +23,8 @@ final class PlayerModel {
     private(set) var savingPulse = 0
     private(set) var slotThumbs: [Int: UIImage] = [:]
     private(set) var slotDates: [Int: Date] = [:]
+    /// DEBUG: "samplesPulled peak" for the UI test.
+    private(set) var audioStats = "0 0"
     var screenMode: ScreenMode {
         didSet { UserDefaults.standard.set(screenMode.rawValue, forKey: "screenMode.\(game.system.rawValue)") }
     }
@@ -32,6 +34,7 @@ final class PlayerModel {
     @ObservationIgnored private var romCRC: UInt32 = 0
     @ObservationIgnored private var startTime = Date()
     @ObservationIgnored private var batteryTimer: Timer?
+    @ObservationIgnored private var debugTimer: Timer?
     @ObservationIgnored private var lastBattery: Data?
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
     @ObservationIgnored private var toastTask: Task<Void, Never>?
@@ -78,6 +81,15 @@ final class PlayerModel {
         batteryTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.flushBattery() }
         }
+        #if DEBUG
+        debugTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let ring = self?.session.audio else { return }
+                self?.audioStats = "\(ring.samplesPulled) \(ring.peakOut)"
+                AudioOutput.log.info("ring fill \(ring.fill) pulled \(ring.samplesPulled) peak \(ring.peakOut)")
+            }
+        }
+        #endif
         let center = NotificationCenter.default
         observers.append(center.addObserver(forName: UIApplication.willResignActiveNotification, object: nil,
                                             queue: .main) { [weak self] _ in
@@ -102,6 +114,7 @@ final class PlayerModel {
         writeAutoState()
         flushBattery()
         batteryTimer?.invalidate()
+        debugTimer?.invalidate()
         observers.forEach(NotificationCenter.default.removeObserver)
         observers.removeAll()
         controller.releaseAll()

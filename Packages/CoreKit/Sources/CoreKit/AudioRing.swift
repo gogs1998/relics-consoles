@@ -11,6 +11,10 @@ public final class AudioRing: @unchecked Sendable {
     private let tail = Atomic<Int>(0)   // next read index (consumer)
     /// Last sample handed to the device: an underrun decays from here instead of clicking.
     private var lastOut: Float = 0
+    /// Loudest sample handed to the device and how many samples the device has pulled
+    /// (diagnostics; written by the audio thread, read loosely elsewhere).
+    public private(set) var peakOut: Float = 0
+    public private(set) var samplesPulled: Int = 0
 
     public init(capacityPowerOfTwo: Int = 1 << 14) {
         precondition(capacityPowerOfTwo > 0 && capacityPowerOfTwo & (capacityPowerOfTwo - 1) == 0)
@@ -43,7 +47,12 @@ public final class AudioRing: @unchecked Sendable {
         let t = tail.load(ordering: .relaxed)
         let h = head.load(ordering: .acquiring)
         let n = min(h &- t, count)
-        for i in 0..<n { out[i] = buffer[(t &+ i) & mask] }
+        for i in 0..<n {
+            let v = buffer[(t &+ i) & mask]
+            out[i] = v
+            if abs(v) > peakOut { peakOut = abs(v) }
+        }
+        samplesPulled &+= count
         if n > 0 { lastOut = out[n - 1] }
         if n < count {
             var v = lastOut

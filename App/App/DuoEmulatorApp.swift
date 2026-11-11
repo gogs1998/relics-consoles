@@ -6,6 +6,15 @@ import SwiftUI
 struct DuoEmulatorApp: App {
     @State private var store = GameStore()
 
+    init() {
+        #if DEBUG
+        // -duoAspect NO: draw like an ordinary iPhone (no 1.42 letterbox) for "plain phone" checks.
+        if UserDefaults.standard.object(forKey: "duoAspect") != nil, !UserDefaults.standard.bool(forKey: "duoAspect") {
+            MainActor.assumeIsolated { FoldSimulator.shared.constrainToDuoAspect = false }
+        }
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView(store: store)

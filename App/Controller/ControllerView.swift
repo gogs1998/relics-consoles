@@ -237,7 +237,8 @@ struct PillKeyView: View {
                     .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.8))
                     .offset(y: pressed ? 1 : 0)
             }
-            .rotationEffect(.degrees(-18))
+            .frame(height: 13)
+            .rotationEffect(.degrees(-14))
             Text(label)
                 .font(.rounded(.caption2, weight: .bold))
                 .tracking(1.2)

@@ -1,0 +1,71 @@
+# CLAUDE.md: Duo Emulator (working title "Foldback")
+
+A Duo-first multi-system retro game emulator for the iPhone Duo, also for ordinary iPhone and iPad.
+Players load games they own through the Files picker; nothing is bundled or downloaded. Read
+`HANDOFF.md` (state, what's verified, decisions pending), `docs/design.md` (approved design, with the
+Fable review changes in §10) and `docs/research.md` (App Store 4.7, core licensing, wish lists) first.
+
+## Hard rules
+- **Never** download, bundle, generate or point to commercial ROMs or BIOS files. Test only with our
+  own ROMs (`TestROMs/`, built by our own assemblers). Third-party test suites, homebrew and emulator
+  cores need Gordon's approval first (lists in `docs/research.md` §6 and `HANDOFF.md`).
+- No GPL or non-commercial code in the binary (research §2). NES and GB/GBC cores are ours.
+- No console logos, trade dress, silhouettes, console colour schemes or real system fonts. No console
+  brand in the app name. Systems are named in plain text only ("NES", "Game Boy Color").
+- No in-app game downloads (keeps us out of guideline 4.7.1-4.7.5). No network, ads, analytics, accounts.
+- Test ROM headers for GB must leave $0104-$0133 zero (no boot logo). No boot ROMs.
+- Branch on pose and fold geometry, never the hinge angle. No `PoseDetector`: a horizontal fold is always
+  the laptop (table) layout. Nothing may require folding.
+
+## Toolchain
+- Xcode 27.1, iOS 27.1 SDK, deployment iOS 26.0, Swift 6 strict concurrency, SwiftUI, Metal.
+- XcodeGen: `project.yml`. Never hand-edit `DuoEmulator.xcodeproj` (gitignored): `xcodegen generate`.
+- DuoKit `github.com/gogs1998/iqlabs-duokit` from 0.1.2 (don't fork; gaps go in `docs/DUOKIT-GAPS.md`).
+- CoreKit: local package `Packages/CoreKit` (targets CoreKit, NESCore, GBCore; cores build `-Ounchecked`
+  even in Debug so the simulator runs full speed). Tests run on the Mac:
+  `cd Packages/CoreKit && swift test --scratch-path ../../build/corekit`
+- Test ROMs: `python3 Tools/build_test_roms.py` (NES, own 6502 assembler `Tools/asm6502.py`, art in
+  `Tools/chrart.py`) and `python3 Tools/build_gb_roms.py` (GB, `Tools/asm_sm83.py`). Outputs in
+  `TestROMs/build/` are committed. A Debug-only build phase copies them into the app as `TestCarts/`;
+  Release strips them and fails the build if any ROM file is in the bundle.
+- Signing: `Local.xcconfig` (gitignored, copied from talking-computers-night) has `DEVELOPMENT_TEAM = 36UUUS8G8L`.
+  Bundle id `com.iqlabs.duoemulator` is a placeholder; not registered, no App Store Connect record.
+- Build: `Tools/build.sh` (checks >= 4 GB free, takes the shared PID-file lock `/private/tmp/duo-build.lock`,
+  DerivedData in `build/`). Release check: `Tools/build.sh -configuration Release -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO`.
+- Simulators: at most 2 booted Mac-wide; use your own, log it in `/private/tmp/claude-501/shared/SIMS.txt`,
+  shut down and erase when done. Never touch D8C4096C. Duo layouts: DuoKit's DEBUG `-pose table|book|flat`
+  on an ordinary iPhone simulator; **book pose must be shot in landscape** (rotate the simulator).
+
+## Architecture
+- `Packages/CoreKit/Sources/CoreKit`: `EmulatorCore` protocol (runFrame, framebuffer BGRA, drainAudio,
+  batteryRAM, save/load state), `SystemID`, `InputState`, `CoreFactory.detect`, `AudioRing` (lock-free SPSC),
+  `Decimator` (per-clock audio → 48 kHz with DC blockers and low-pass), `StateCoder` (one `sync` function
+  serialises both ways, section tags), `StateContainer` (file wrapper: magic, versions, system, ROM CRC).
+- `NESCore`: `NESSystem` (6502 where every bus access ticks PPU x3 + APU, so dummy reads give real timing;
+  common unofficial opcodes), `PPU` (dot-based, loopy registers, sprite eval at 257, sprite-0 hit),
+  `APU` (2 pulse, triangle, noise, DMC, frame counter, non-linear mixer), `Cartridge` (iNES/NES 2.0,
+  bank tables) + mappers 0, 1, 2, 3, 4, 7. Palette generated from a YIQ model (ours).
+- `GBCore` (helper-built, Fable-reviewed): `GBSystem` (SM83, timer, DMA/HDMA, double speed), `PPU`, `APU`,
+  `Cartridge` (MBC1/2/3/5).
+- App (`App/`): `RootView` (DuoStageReader → Library or Player), `GameStore` (Documents/Games|Saves|States,
+  `.library.json`, Inbox scan, import with header detection), `EmulatorSession` (dedicated thread owns the
+  core, built on that thread; commands via Mutex; self-paced with ±0.5 % dynamic rate control from the audio
+  ring; fast-forward x3; rewind ring of states every 4 frames capped at 8 MB), `FrameExchange` (lock + latest
+  frame), `GameScreen`/`Renderer` (MTKView, one quad, `Shaders.metal`: sharp-bilinear, nearest, scanlines, LCD;
+  `ScreenFit` picks integer scaling in device pixels when it fills ≥ 85 %), `AudioOutput` (AVAudioSourceNode
+  built in a `nonisolated static` helper), `PhysicalInput` (GCController + GCKeyboard), `ControllerModel` +
+  `TouchSurface` (UIKit multi-touch, per-touch ownership) + `ControllerView` (the Graphite and Ember
+  controller drawing), `PlayerView` (table / book / portrait / landscape arrangements), `PlayerMenu`,
+  `LibraryView` (+ `GameCard`, generated labels).
+
+## DEBUG launch arguments
+`-pose table|book|flat`, `-autoplay demo.nes` (a bundled test cart by file name), `-holdInput right,a`,
+`-openMenu YES`, `-freshStart YES` (ignore the auto-save).
+
+## Conventions
+- Dynamic Type text styles only (`Font.rounded(_:weight:)`), never fixed point sizes for text.
+- Zero warnings (the `appintentsmetadataprocessor` "Metadata extraction skipped" line is a tool message).
+- VoiceOver labels on every control.
+- Say what is simulator-only. Audio, haptics, controllers and real Duo poses need Gordon's device check.
+- Commits: `git -c user.name="Gordon Shepherd" -c user.email=gordon@iqlabs.app commit`, ending with
+  `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Don't push; no GitHub repo yet.

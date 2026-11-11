@@ -51,6 +51,10 @@ final class ControllerModel {
     private(set) var fastForwardDown = false
     private(set) var rewindDown = false
     var hapticsEnabled = true
+    #if DEBUG
+    /// Every button the touch layer has pressed this session (UI tests read it).
+    private(set) var everPressed: InputState = []
+    #endif
 
     @ObservationIgnored weak var latch: InputLatch?
     @ObservationIgnored var onMenu: (() -> Void)?
@@ -70,6 +74,9 @@ final class ControllerModel {
             }
         }
         if newPressed != pressed { pressed = newPressed }
+        #if DEBUG
+        if !newPressed.isSubset(of: everPressed) { everPressed.formUnion(newPressed) }
+        #endif
         if dpad != dpadVector { dpadVector = dpad }
         latch?.touch.store(newPressed.rawValue, ordering: .relaxed)
         if menuDown && !menu { onMenu?() }   // fires on release
@@ -108,7 +115,7 @@ enum ControllerLayout {
         let ax = bx + face * 1.22, ay = midY - face * 0.42
         c.append(Control(kind: .face(.b, "B", .sand), frame: CGRect(x: bx - face / 2, y: by - face / 2, width: face, height: face)))
         c.append(Control(kind: .face(.a, "A", .ember), frame: CGRect(x: ax - face / 2, y: ay - face / 2, width: face, height: face)))
-        let pillW = min(64, w * 0.13), pillH: CGFloat = 20
+        let pillW = min(58, w * 0.13), pillH: CGFloat = 34
         let pillY = min(h - pillH - 22, midY + dpad * 0.5)
         c.append(Control(kind: .pill(.select, "SELECT"), frame: CGRect(x: w * 0.5 - pillW - 10, y: pillY, width: pillW, height: pillH)))
         c.append(Control(kind: .pill(.start, "START"), frame: CGRect(x: w * 0.5 + 10, y: pillY, width: pillW, height: pillH)))

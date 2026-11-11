@@ -100,9 +100,15 @@ struct SlotShelf: View {
                     Button {
                         model.saveState(slot: slot)
                     } label: {
-                        Text(compact ? "Save" : "Save \(slot)")
-                            .font(.rounded(.caption, weight: .bold))
-                            .frame(maxWidth: .infinity)
+                        Group {
+                            if compact {
+                                Image(systemName: "square.and.arrow.down")
+                            } else {
+                                Text("Save \(slot)")
+                            }
+                        }
+                        .font(.rounded(.caption, weight: .bold))
+                        .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(ChipStyle(selected: false, dense: true))
                     .accessibilityLabel("Save to slot \(slot)")
@@ -122,9 +128,10 @@ struct CompanionPage: View {
             HStack {
                 Text("STATES")
                     .font(.rounded(.caption2, weight: .heavy))
-                    .tracking(1.6)
+                    .tracking(1.2)
                     .foregroundStyle(Theme.inkDim)
-                Spacer()
+                    .fixedSize()
+                Spacer(minLength: 4)
                 CompanionKey(symbol: "backward.fill", label: "Rewind (hold)", active: model.rewinding) { on in
                     model.setRewind(on)
                 }

@@ -42,6 +42,24 @@ struct PlayerView: View {
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
         .onChange(of: arrangement) { _, _ in model.controller.releaseAll() }
+        #if DEBUG
+        .overlay(alignment: .topLeading) {
+            Text("audio \(model.audioStats)")
+                .font(.caption2)
+                .opacity(0.01)
+                .accessibilityIdentifier("debug.audio")
+                .accessibilityValue(model.audioStats)
+                .allowsHitTesting(false)
+        }
+        .overlay(alignment: .topTrailing) {
+            Text("touch \(model.controller.everPressed.rawValue)")
+                .font(.caption2)
+                .opacity(0.01)
+                .accessibilityIdentifier("debug.touchInput")
+                .accessibilityValue("\(model.controller.everPressed.rawValue)")
+                .allowsHitTesting(false)
+        }
+        #endif
     }
 
     // MARK: arrangements
