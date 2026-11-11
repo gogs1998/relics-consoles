@@ -1,0 +1,66 @@
+name: DuoEmulator
+options:
+  bundleIdPrefix: com.iqlabs
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+configFiles:
+  Debug: Local.xcconfig
+  Release: Local.xcconfig
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    CODE_SIGN_STYLE: Automatic
+packages:
+  DuoKit:
+    url: https://github.com/gogs1998/iqlabs-duokit
+    from: 0.1.2
+  CoreKit:
+    path: Packages/CoreKit
+targets:
+  DuoEmulator:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+    dependencies:
+      - package: DuoKit
+      - package: CoreKit
+        product: CoreKit
+    postBuildScripts:
+      - name: Test ROMs (Debug only) and Release ROM check
+        basedOnDependencyAnalysis: false
+        script: |
+          APP="${TARGET_BUILD_DIR}/${WRAPPER_NAME}"
+          if [ "${CONFIGURATION}" = "Debug" ]; then
+            mkdir -p "${APP}/TestCarts"
+            cp "${SRCROOT}"/TestROMs/build/*.nes "${SRCROOT}"/TestROMs/build/*.gb "${SRCROOT}"/TestROMs/build/*.gbc "${APP}/TestCarts/" 2>/dev/null || true
+          else
+            rm -rf "${APP}/TestCarts"
+            FOUND=$(find "${APP}" \( -iname '*.nes' -o -iname '*.gb' -o -iname '*.gbc' -o -iname '*.zip' \) | head -1)
+            if [ -n "${FOUND}" ]; then echo "error: ROM file inside a Release bundle: ${FOUND}"; exit 1; fi
+          fi
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.iqlabs.duoemulator
+        PRODUCT_NAME: DuoEmulator
+        INFOPLIST_FILE: App/Resources/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1,2"
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+      configs:
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+schemes:
+  DuoEmulator:
+    build:
+      targets:
+        DuoEmulator: all
+    run:
+      config: Debug
+    archive:
+      config: Release

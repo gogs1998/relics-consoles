@@ -64,3 +64,14 @@ func framebufferHash(_ fb: UnsafeBufferPointer<UInt32>) -> UInt32 {
         #expect(fps > 120)
     }
 }
+
+@Suite struct NESMapperTests {
+    @Test(arguments: ["mmc1_probe.nes", "uxrom_probe.nes", "cnrom_probe.nes", "mmc3_probe.nes"])
+    func mapperProbePasses(_ name: String) throws {
+        let nes = try NESSystem(rom: try testROM(name), battery: nil)
+        for _ in 0..<40 { nes.runFrame(input: []) }
+        #expect(nes.debugPeek(0x6001) == 0xDE, "\(name) never started")
+        let result = nes.debugPeek(0x6000)
+        #expect(result == 0, "\(name) failed test \(result)")
+    }
+}
