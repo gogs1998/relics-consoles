@@ -9,7 +9,13 @@ Fable review changes in §10) and `docs/research.md` (App Store 4.7, core licens
 - **Never** download, bundle, generate or point to commercial ROMs or BIOS files. Test only with our
   own ROMs (`TestROMs/`, built by our own assemblers). Third-party test suites, homebrew and emulator
   cores need Gordon's approval first (lists in `docs/research.md` §6 and `HANDOFF.md`).
-- No GPL or non-commercial code in the binary (research §2). NES and GB/GBC cores are ours.
+- No GPL or non-commercial code in the binary (research §2). NES and GB/GBC cores are ours; GBA is mGBA
+  (MPL-2.0, vendored unmodified in `Packages/CoreKit/Sources/MGBA/mgba`, any change must go in
+  `ThirdParty/mgba/patches/` and be published); SNES and Mega Drive are ares (ISC, vendored unmodified in
+  `Sources/ARES/ares`, our stand-ins in `glue/shim`). Licence texts: `Licenses/` (repo) and
+  `App/Resources/Licences/` (shown in About). Keep both in sync when a component is added.
+- No JIT, ever (no sljit/recompilers). No firmware: SNES DSP-n/ST01x/Cx4 games are refused; the SPC700
+  boot program is our own (`kBootProgram` in `ares_glue.cpp`, rewritten from the protocol after a review).
 - No console logos, trade dress, silhouettes, console colour schemes or real system fonts. No console
   brand in the app name. Systems are named in plain text only ("NES", "Game Boy Color").
 - No in-app game downloads (keeps us out of guideline 4.7.1-4.7.5). No network, ads, analytics, accounts.
@@ -21,17 +27,26 @@ Fable review changes in §10) and `docs/research.md` (App Store 4.7, core licens
 - Xcode 27.1, iOS 27.1 SDK, deployment iOS 26.0, Swift 6 strict concurrency, SwiftUI, Metal.
 - XcodeGen: `project.yml`. Never hand-edit `DuoEmulator.xcodeproj` (gitignored): `xcodegen generate`.
 - DuoKit `github.com/gogs1998/iqlabs-duokit` from 0.1.2 (don't fork; gaps go in `docs/DUOKIT-GAPS.md`).
-- CoreKit: local package `Packages/CoreKit` (targets CoreKit, NESCore, GBCore; cores build `-Ounchecked`
-  even in Debug so the simulator runs full speed). Tests run on the Mac:
+- CoreKit: local package `Packages/CoreKit` (targets CoreKit, NESCore, GBCore, MGBA + GBACore, ARES + AresCore;
+  Swift cores build `-Ounchecked -enforce-exclusivity=unchecked`, C/C++ at -O2, even in Debug).
+  ares keeps one console in process globals: one SNES/MD core per process (EmulatorSession's `coreGate`).
+  Tests run on the Mac:
   `cd Packages/CoreKit && swift test --scratch-path ../../build/corekit`
 - Test ROMs: `python3 Tools/build_test_roms.py` (NES, own 6502 assembler `Tools/asm6502.py`, art in
-  `Tools/chrart.py`) and `python3 Tools/build_gb_roms.py` (GB, `Tools/asm_sm83.py`). Outputs in
-  `TestROMs/build/` are committed. A Debug-only build phase copies them into the app as `TestCarts/`;
+  `Tools/chrart.py`), `python3 Tools/build_gb_roms.py` (GB, `Tools/asm_sm83.py`), `Tools/build_gba_roms.py`,
+  `Tools/build_ares_roms.py` (SNES + MD, hand-assembled).
+- Accuracy suites (approved, gitignored, never bundled) in `TestSuites/`; harness and how to run: `docs/accuracy.md`.
+- Our test-ROM outputs in `TestROMs/build/` are committed. A Debug-only build phase copies them into the app as `TestCarts/`;
   Release strips them and fails the build if any ROM file is in the bundle.
 - Signing: `Local.xcconfig` (gitignored, copied from talking-computers-night) has `DEVELOPMENT_TEAM = 36UUUS8G8L`.
-  Bundle id `com.iqlabs.duoemulator` is a placeholder; not registered, no App Store Connect record.
+  Bundle id `com.iqlabs.duoemulator`; App Store Connect record "Foldback" (app id 6833521756, internal group
+  "Team"). Upload only with Gordon's go-ahead: `xcodegen generate` first, then
+  `~/duo-remote/Tools/upload.sh /Users/gordonshepherd/duo-emulator DuoEmulator /private/tmp/<outdir>`; delete the outdir after.
+  Never submit for review.
 - Build: `Tools/build.sh` (checks >= 4 GB free, takes the shared PID-file lock `/private/tmp/duo-build.lock`,
   DerivedData in `build/`). Release check: `Tools/build.sh -configuration Release -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO`.
+- After any simulator run, `xcrun simctl terminate <udid> com.iqlabs.duoemulator` so no game audio keeps playing.
+  Prefer headless core tests.
 - Simulators: at most 2 booted Mac-wide; use your own, log it in `/private/tmp/claude-501/shared/SIMS.txt`,
   shut down and erase when done. Never touch D8C4096C. Duo layouts: DuoKit's DEBUG `-pose table|book|flat`
   on an ordinary iPhone simulator; **book pose must be shot in landscape** (rotate the simulator).

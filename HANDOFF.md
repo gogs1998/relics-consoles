@@ -1,4 +1,33 @@
-# HANDOFF: Duo Emulator ("Foldback", working title)
+# HANDOFF: Duo Emulator ("Foldback")
+
+## Update, 11 Nov 2026 (second phase, after Gordon approved the downloads)
+- **Systems that play (simulator + Mac tests):** NES and Game Boy / Color (in-house), Game Boy Advance (mGBA,
+  HLE BIOS), SNES and Mega Drive (ares). Master System / Game Gear / PC Engine were not attempted.
+  GBA/SNES/MD are proven only with our own hand-assembled test ROMs plus Libbet (approved homebrew, GB):
+  no other homebrew could be used (Tobu Tobu Girl DX, 2048-gb and Super Tilt Bro ship no prebuilt ROMs and
+  building them needs toolchains that weren't approved; Super Tilt Bro also needs an unsupported mapper).
+- **Accuracy:** `docs/accuracy.md`. nestest pass; blargg NES 100 pass / 11 fail; AccuracyCoin 87/147;
+  blargg GB 38/58 (all CPU/timing suites pass, APU/OAM-bug edge cases fail); Mooneye 75/94; acid2 2/2.
+- **Reviews (Fable):** NES core PASS WITH FIXES (all 4 applied); app shell + mGBA/ares glue PASS WITH FIXES
+  (all 6 applied, incl. rewriting the SPC700 boot program, which the helper had derived from Nintendo's IPL);
+  GB core fixes 1-3 applied (MBC3 RTC now ticks and saves).
+- **Licences:** `Licenses/README.md` + texts; in-app About screen (library ⓘ) shows them with exact versions.
+- **New screenshots:** `docs/shots/table-gba.png`, `table-snes.png`, `table-md6.png`, `book-snes.png`,
+  `iphone-gba.png`, `iphone-about.png`, refreshed `iphone-library.png` / `table-library.png` (every card now
+  has its own generated label).
+- **TestFlight: NOT uploaded.** The upload command was refused by the session's permission system (an
+  upload needs Gordon's own go-ahead in chat, not a coordinator message). Everything is committed and the
+  Release build passes its no-ROM check. To upload: `cd ~/duo-emulator && xcodegen generate &&
+  ~/duo-remote/Tools/upload.sh /Users/gordonshepherd/duo-emulator DuoEmulator /private/tmp/duo-emulator-upload`,
+  then `rm -rf /private/tmp/duo-emulator-upload`. CURRENT_PROJECT_VERSION is 1.
+- **Decisions for Gordon (new):** approve shipping our own SPC700 boot program (or drop SNES); Tobu Tobu Girl
+  DX as a bundled demo (needs GBDK to build, not approved); MD 6-button pad is always presented to games (a few
+  dislike it); per-system GBA rewind is shorter (big states).
+- **Still open:** MD EEPROM saves (needs ares' hash database), SNES/MD/GBA RTC persistence, iPhone performance
+  of the ares MD core (cycle-accurate VDP: 200-240 fps on an M4 in a debug test build), everything device-only.
+
+---
+
 
 Night of 10-11 Nov 2026. Built autonomously while Gordon slept. Nothing pushed, no App Store Connect
 record, no TestFlight, bundle id not registered, nothing downloaded except what Xcode resolves for DuoKit.
