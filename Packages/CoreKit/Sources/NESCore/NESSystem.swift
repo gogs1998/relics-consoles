@@ -661,10 +661,40 @@ public final class NESSystem: EmulatorCore {
             fC = ax >= v
             x = ax &- v
             setZN(x)
+        // ---- the "unstable" stores: value ANDed with (high byte of the base address + 1); on a
+        //      page cross that value also replaces the high byte of the target (RP2A03G behaviour).
+        case 0x9C: storeH(y, index: x, base: fetch16())                       // SHY abs,X
+        case 0x9E: storeH(x, index: y, base: fetch16())                       // SHX abs,Y
+        case 0x9F: storeH(a & x, index: y, base: fetch16())                   // SHA abs,Y
+        case 0x93:                                                             // SHA (zp),Y
+            let p = fetch()
+            let base = UInt16(read(UInt16(p))) | (UInt16(read(UInt16(p &+ 1))) << 8)
+            storeH(a & x, index: y, base: base)
+        case 0x9B:                                                             // TAS abs,Y
+            s = a & x
+            storeH(s, index: y, base: fetch16())
+        case 0xBB:                                                             // LAS abs,Y
+            let v = read(absIndexed(y, alwaysDummy: false)) & s
+            a = v; x = v; s = v; setZN(v)
+        case 0x8B:                                                             // ANE (magic $EE)
+            let v = fetch()
+            a = (a | 0xEE) & x & v; setZN(a)
+        case 0xAB:                                                             // LXA (magic $EE)
+            let v = fetch()
+            a = (a | 0xEE) & v; x = a; setZN(a)
         default:
-            // KIL and the unstable opcodes: freeze, as hardware does for KIL.
+            // KIL: freeze, as hardware does.
             jammed = true
         }
+    }
+
+    /// SHA/SHX/SHY/TAS store: always a dummy read, then `value & (H + 1)`.
+    @inline(__always) private func storeH(_ value: UInt8, index: UInt8, base: UInt16) {
+        var addr = base &+ UInt16(index)
+        _ = read((base & 0xFF00) | (addr & 0x00FF))
+        let v = value & (UInt8(base >> 8) &+ 1)
+        if (base & 0xFF00) != (addr & 0xFF00) { addr = (UInt16(v) << 8) | (addr & 0x00FF) }
+        write(addr, v)
     }
 
     @inline(__always) private func rmwDCP(_ addr: UInt16) {

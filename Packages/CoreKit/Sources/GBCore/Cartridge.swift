@@ -33,6 +33,9 @@ final class Cartridge {
     var latchPrev: UInt8 = 0xFF
     var rtc = [UInt8](repeating: 0, count: 5)
     var rtcLatched = [UInt8](repeating: 0, count: 5)
+    /// Sub-second progress of the MBC3 clock, in half-M-cycles at normal speed (2,097,152 a second).
+    var rtcSub = 0
+    static let rtcUnitsPerSecond = 2_097_152
 
     init(rom data: Data) throws {
         guard data.count >= 0x150 else { throw CoreError.corruptFile("too short for a Game Boy cartridge") }
@@ -110,10 +113,61 @@ final class Cartridge {
         update()
     }
 
-    func loadBattery(_ data: Data) {
+    func loadBattery(_ data: Data, now: Date = Date()) {
         let n = min(data.count, ramSize)
-        guard n > 0 else { return }
-        data.withUnsafeBytes { raw in ram.update(from: raw.bindMemory(to: UInt8.self).baseAddress!, count: n) }
+        if n > 0 {
+            data.withUnsafeBytes { raw in ram.update(from: raw.bindMemory(to: UInt8.self).baseAddress!, count: n) }
+        }
+        // The widely used RTC footer after the RAM: 5 registers and 5 latched registers as 32-bit
+        // little-endian words, then a 64-bit (or 32-bit) Unix timestamp of when it was saved.
+        let footer = data.count - ramSize
+        guard hasRTC, footer == 48 || footer == 44 else { return }
+        let b = [UInt8](data.suffix(footer))
+        func word(_ i: Int) -> UInt8 { b[i * 4] }
+        for i in 0..<5 { rtc[i] = word(i); rtcLatched[i] = word(5 + i) }
+        var stamp: UInt64 = 0
+        for i in 0..<(footer - 40) { stamp |= UInt64(b[40 + i]) << (8 * UInt64(i)) }
+        let elapsed = Int(now.timeIntervalSince1970) - Int(stamp)
+        if stamp > 0, elapsed > 0 { advanceRTC(seconds: min(elapsed, 10 * 365 * 86_400)) }
+    }
+
+    /// Battery contents: RAM, plus the RTC footer for clock cartridges.
+    func batteryData(now: Date = Date()) -> Data? {
+        guard hasBattery else { return nil }
+        var d = ramSize > 0 ? Data(bytes: ram, count: ramSize) : Data()
+        if hasRTC {
+            for v in rtc + rtcLatched { d.append(contentsOf: [v, 0, 0, 0]) }
+            var t = UInt64(max(0, now.timeIntervalSince1970))
+            for _ in 0..<8 { d.append(UInt8(t & 0xFF)); t >>= 8 }
+        }
+        return d.isEmpty ? nil : d
+    }
+
+    /// Advances the clock by emulated time (called once per frame).
+    func tickRTC(units: Int) {
+        guard hasRTC, (rtc[4] & 0x40) == 0 else { return }
+        rtcSub += units
+        if rtcSub >= Self.rtcUnitsPerSecond {
+            let secs = rtcSub / Self.rtcUnitsPerSecond
+            rtcSub -= secs * Self.rtcUnitsPerSecond
+            advanceRTC(seconds: secs)
+        }
+    }
+
+    func advanceRTC(seconds: Int) {
+        guard (rtc[4] & 0x40) == 0, seconds > 0 else { return }
+        var s = Int(rtc[0] & 0x3F) + seconds
+        var m = Int(rtc[1] & 0x3F) + s / 60
+        s %= 60
+        var h = Int(rtc[2] & 0x1F) + m / 60
+        m %= 60
+        var day = (Int(rtc[4] & 1) << 8 | Int(rtc[3])) + h / 24
+        h %= 24
+        var carry = (rtc[4] & 0x80) != 0
+        if day > 511 { carry = true; day %= 512 }
+        rtc[0] = UInt8(s); rtc[1] = UInt8(m); rtc[2] = UInt8(h)
+        rtc[3] = UInt8(day & 0xFF)
+        rtc[4] = (rtc[4] & 0x40) | UInt8(day >> 8) | (carry ? 0x80 : 0)
     }
 
     private func update() {
@@ -196,7 +250,12 @@ final class Cartridge {
         case .mbc2:
             ram[Int(addr & 0x1FF)] = v | 0xF0
         case .mbc3 where ramBank >= 8:
-            if ramBank <= 12 { rtc[ramBank - 8] = v; rtcLatched[ramBank - 8] = v }
+            if ramBank <= 12 {
+                let masks: [UInt8] = [0x3F, 0x3F, 0x1F, 0xFF, 0xC1]
+                rtc[ramBank - 8] = v & masks[ramBank - 8]
+                rtcLatched[ramBank - 8] = rtc[ramBank - 8]
+                if ramBank == 8 { rtcSub = 0 }   // writing seconds resets the divider
+            }
         default:
             guard ramSize > 0 else { return }
             ram[(ramOff + Int(addr & 0x1FFF)) & (ramSize - 1)] = v
@@ -207,7 +266,7 @@ final class Cartridge {
         st.section("CART")
         st.sync(&bankLo); st.sync(&bankHi); st.sync(&mode); st.sync(&ramBank)
         st.sync(&ramOn); st.sync(&latchPrev)
-        st.array(&rtc); st.array(&rtcLatched)
+        st.array(&rtc); st.array(&rtcLatched); st.sync(&rtcSub)
         if ramSize > 0 { st.bytes(ram, count: ramSize) }
         if st.isReading { update() }
     }

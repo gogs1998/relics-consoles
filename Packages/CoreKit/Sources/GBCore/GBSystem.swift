@@ -57,6 +57,8 @@ public final class GBSystem: EmulatorCore {
     var padState: UInt8 = 0          // bit 0-3 A B Select Start, bit 4-7 Right Left Up Down (1 = pressed)
     var p1Select: UInt8 = 0x30
     var sb: UInt8 = 0, sc: UInt8 = 0
+    /// Bytes sent out of the serial port (test ROMs print results there). Not part of save states.
+    public internal(set) var serialLog: [UInt8] = []
 
     // memory banking
     var wramOff = 0x1000
@@ -173,6 +175,9 @@ public final class GBSystem: EmulatorCore {
         while !ppu.frameComplete && cycles &- start < limit {
             step()
         }
+        // The MBC3 clock runs from its own crystal: count real time, not CPU speed.
+        let m = Int(cycles &- start)
+        cart.tickRTC(units: doubleSpeed ? m : m * 2)
     }
 
     public func drainAudio(into ring: AudioRing) {
@@ -182,7 +187,7 @@ public final class GBSystem: EmulatorCore {
     public func discardAudio() { apu.decimator.discard() }
 
     public var batteryRAM: Data? {
-        cart.hasBattery && cart.ramSize > 0 ? Data(bytes: cart.ram, count: cart.ramSize) : nil
+        cart.batteryData()
     }
 
     public func saveState() -> Data {
@@ -379,6 +384,7 @@ public final class GBSystem: EmulatorCore {
             sc = v
             // No link partner: an internally clocked transfer completes at once and reads $FF.
             if (v & 0x81) == 0x81 {
+                if serialLog.count < 4096 { serialLog.append(sb) }   // test ROMs report here
                 sb = 0xFF
                 sc &= 0x7F
                 ifReg |= 0x08
