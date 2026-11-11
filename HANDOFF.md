@@ -7,7 +7,7 @@ record, no TestFlight, bundle id not registered, nothing downloaded except what 
 The research and design docs exist (design approved with changes by a Fable review; changes folded in,
 `docs/design.md` §10). CoreKit holds a clean core protocol and two in-house cores: **NES** (6502, PPU, APU,
 mappers 0/1/2/3/4/7) and **Game Boy / Game Boy Color** (SM83, PPU, APU, MBC1/2/3/5; helper-built, Fable
-reviewed, first must-fix applied). The app shell has the shelf, Files import, Metal renderer with four
+reviewed; must-fixes 1 and 3 applied, 2 open). The app shell has the shelf, Files import, Metal renderer with four
 screen modes, AVAudioEngine audio, the Graphite and Ember touch controller in table / book / portrait /
 landscape arrangements, GameController and keyboard input, save states (4 slots + auto), battery saves,
 rewind and fast-forward. It runs in the simulator with our own NES and GB test carts: picture, sound and
@@ -79,13 +79,16 @@ from it at the end. D8C4096C was never touched.
 | ares (SNES/MD/SMS/PCE cores) | https://github.com/ares-emulator/ares | ISC (+ bundled BSD/zlib/MPL parts) | 183 MB repo |
 
 ## Known gaps and next steps
-- GB review must-fixes still open: (2) MBC3 real-time clock doesn't tick or persist; (3) GB PPU renders each
-  line at the start of mode 3, so mid-line/HBlank raster effects land a line late. NES: no PAL, no
+- GB review: fixes 1 (EI;HALT halt bug) and 3 (lines redrawn at the end of mode 3) are applied; **fix 2
+  is still open**: the MBC3 real-time clock doesn't tick or persist (affects clock-based games). Per-pixel
+  mid-line effects are still not modelled. NES: no PAL, no
   mappers beyond 0/1/2/3/4/7 (add 9/10/11/66/69 next), sprite overflow bug not modelled, DMC DMA timing
   approximate, MMC3 IRQ uses the dot-260 approximation rather than watching A12.
 - Not built yet: remapping UI, cheats, zip import, iCloud sync, skins, settings screen (haptics toggle,
   audio mix setting, pixel aspect), overscan crop, `CAMetalDisplayLink` pacing, three-texture ring,
   widgets, AirPlay screen.
+- Library labels are generated (stripes and a sun in the system tint) until a game has been played,
+  when the auto-save screenshot becomes the artwork; a shelf of unplayed games looks samey.
 - Library on Duo: tap selects then tap again plays (hero panel on the top half); might want a direct play
   gesture. Context menu has rename/remove ("Recently Deleted" folder in Files).
 - The rewind snapshot is a full state every 4 frames; fine for NES/GB (~10-30 KB), would need delta
