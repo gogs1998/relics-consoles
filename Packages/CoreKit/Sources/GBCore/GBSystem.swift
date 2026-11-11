@@ -31,6 +31,8 @@ public final class GBSystem: EmulatorCore {
     var eiPending = false
     var halted = false
     var haltBug = false
+    /// True while executing the instruction after EI (IME turns on at its end).
+    var imeTurningOn = false
     var stopped = false
     var locked = false               // an illegal opcode hangs the CPU
     var cycles: UInt64 = 0           // M-cycles since power on
@@ -671,13 +673,16 @@ public final class GBSystem: EmulatorCore {
         imeEnableAfterThis = false
         let op = read(pc)
         if haltBug { haltBug = false } else { pc &+= 1 }
+        imeTurningOn = enable && eiPending
         execute(op)
+        imeTurningOn = false
         if enable && eiPending { ime = true; eiPending = false }
         if eiPending && !enable { imeEnableAfterThis = true }
     }
 
     private func dispatchInterrupt() {
         ime = false
+        haltBug = false
         tick(); tick()
         sp &-= 1; write(sp, UInt8(pc >> 8))
         let pending = ie & ifReg & 0x1F      // decided after the high byte is pushed
@@ -818,7 +823,8 @@ public final class GBSystem: EmulatorCore {
     }
 
     private func halt() {
-        if !ime && (ie & ifReg & 0x1F) != 0 {
+        // EI;HALT with an interrupt pending: IME is on by the time HALT ends, so no bug.
+        if !ime && !imeTurningOn && (ie & ifReg & 0x1F) != 0 {
             haltBug = true          // the next opcode byte is read twice
         } else {
             halted = true
