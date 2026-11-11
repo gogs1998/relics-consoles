@@ -36,6 +36,7 @@ final class PlayerModel {
     @ObservationIgnored private let store: GameStore
     @ObservationIgnored private let audio = AudioOutput()
     @ObservationIgnored private var romCRC: UInt32 = 0
+    @ObservationIgnored private var stateVersion: UInt32 = 1
     @ObservationIgnored private var startTime = Date()
     @ObservationIgnored private var batteryTimer: Timer?
     @ObservationIgnored private var debugTimer: Timer?
@@ -69,10 +70,11 @@ final class PlayerModel {
         session.onError = { [weak self] message in
             Task { @MainActor in self?.errorMessage = message }
         }
-        session.onStarted = { [weak self] w, h, crc in
+        session.onStarted = { [weak self] w, h, crc, version in
             Task { @MainActor in
                 self?.videoSize = CGSize(width: w, height: h)
                 self?.romCRC = crc
+                self?.stateVersion = version
                 self?.started = true
                 if autoResume { self?.resumeAutoState() }
             }
@@ -113,8 +115,17 @@ final class PlayerModel {
                                             queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { if self?.menuOpen == false { self?.resume() } }
         })
-        observers.append(center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.menuOpen = true }
+        observers.append(center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] note in
+            let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+            let began = raw.flatMap(AVAudioSession.InterruptionType.init(rawValue:)) == .began
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if began {
+                    self.menuOpen = true           // a call: pause behind the menu
+                } else {
+                    self.audio.restart()           // re-activate the session; the player resumes from the menu
+                }
+            }
         })
     }
 
@@ -178,10 +189,10 @@ final class PlayerModel {
         let url = store.stateURL(for: game, slot: slot)
         let thumbURL = store.thumbnailURL(for: game, slot: slot)
         let thumb = currentThumbnail()
-        let system = game.system, crc = romCRC
+        let system = game.system, crc = romCRC, version = stateVersion
         session.send(.saveState { [weak self] payload in
             guard let payload else { return }
-            let data = StateContainer(system: system, coreStateVersion: 1, romCRC: crc, payload: payload).encoded()
+            let data = StateContainer(system: system, coreStateVersion: version, romCRC: crc, payload: payload).encoded()
             try? data.write(to: url, options: .atomic)
             if let png = thumb { try? png.write(to: thumbURL, options: .atomic) }
             Task { @MainActor in
@@ -201,6 +212,10 @@ final class PlayerModel {
             let c = try StateContainer.decode(data)
             guard c.system == game.system, c.romCRC == romCRC || romCRC == 0 else {
                 show("That state belongs to a different game")
+                return
+            }
+            guard c.coreStateVersion == stateVersion else {
+                show("That state was made by an older version of the app")
                 return
             }
             session.send(.loadState(c.payload) { [weak self] error in

@@ -65,10 +65,15 @@ the only "GPL" hit is that comment).
 ## Firmware: what we never ship and what it costs
 
 - **SPC700 IPL boot ROM** (64 bytes, needed by *every* SNES game): replaced by **our own** boot program
-  (`kBootProgram` in `ares_glue.cpp`, assembly in the comment), written from the documented upload
-  protocol, not from Nintendo's ROM. The test ROM uploads its sound program through it. Decision for
-  Gordon: this is a clean-room functional replacement (like mGBA's HLE BIOS); a game that jumps into the
-  middle of the original ROM or reads its bytes would misbehave (none known among common titles).
+  (`kBootProgram` in `ares_glue.cpp`, assembly in the comment). History: the helper's first version
+  (11 Nov 2026) was found by the Fable review to share ~45 of 64 bytes with Nintendo's IPL, including the
+  protocol-irrelevant RAM clear and its register/zero-page choices, so it was **thrown away and rewritten**
+  by the lead from the protocol alone: no RAM clear, stack at $FF, pointer at $02/$03, its own loop and
+  command detection. The only bytes it shares with any implementation are the handshake values the
+  protocol itself defines ($AA/$BB, $CC). The test ROM uploads and starts its sound program through it.
+  Known difference: zero page is not cleared, so a sound driver that assumes a cleared $00-$EF could
+  misbehave (none known); a game that jumps into the middle of the original ROM would too.
+  Decision for Gordon: ship this functional replacement (like mGBA's HLE BIOS) or drop SNES.
 - SNES coprocessors whose programs are chip firmware are **refused** (`AresError.needsFirmware`) unless
   the player's own dump has the firmware appended (as some dumps do): DSP-1/1A/1B (Super Mario Kart,
   Pilotwings, Super Air Diver, Ballz 3D, Suzuka 8 Hours, ...), DSP-2 (Dungeon Master), DSP-3 (SD Gundam GX),

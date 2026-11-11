@@ -166,8 +166,8 @@ public final class NESSystem: EmulatorCore {
         if apu.dmcFetchPending {
             // DMC DMA: the CPU halts on this read, the DMA fetches the sample (driving the data
             // bus), then the CPU's read happens.
-            apu.dmcFetchPending = false
-            tick(); tick(); tick()
+            tick(); tick(); tick()   // halt, dummy, alignment; the DMA read shares the CPU read cycle
+            apu.dmcFetchPending = false      // (cleared after the ticks so they can't re-request)
             let v = peek(apu.dmcAddress)
             openBus = v
             apu.deliverDMC(v)

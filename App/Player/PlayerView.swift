@@ -86,7 +86,7 @@ struct PlayerView: View {
         let rightPad = CGRect(x: right.minX, y: rightTop.maxY + 4, width: right.width, height: right.maxY - rightTop.maxY - 8)
         return ZStack(alignment: .topLeading) {
             screen(in: leftScreen)
-            ControllerView(controls: ControllerLayout.bookLeft(leftPad.size, system: model.game.system), model: model.controller)
+            ControllerView(controls: ControllerLayout.bookLeft(leftPad.size, system: model.game.system, sixButton: model.sixButtonPad), model: model.controller)
                 .place(leftPad)
             HingeSeam(axis: .vertical).place(stage.fold.frame)
             CompanionPage(model: model, onQuit: onQuit).place(rightTop)

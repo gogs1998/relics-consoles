@@ -97,7 +97,7 @@ final class EmulatorSession: @unchecked Sendable {
 
     /// Reported back to the main actor.
     var onError: (@Sendable (String) -> Void)?
-    var onStarted: (@Sendable (_ videoWidth: Int, _ videoHeight: Int, _ romCRC: UInt32) -> Void)?
+    var onStarted: (@Sendable (_ videoWidth: Int, _ videoHeight: Int, _ romCRC: UInt32, _ stateVersion: UInt32) -> Void)?
     /// The core changed resolution (Mega Drive 256/320 wide, SNES hi-res).
     var onVideoSize: (@Sendable (_ videoWidth: Int, _ videoHeight: Int) -> Void)?
 
@@ -164,7 +164,7 @@ final class EmulatorSession: @unchecked Sendable {
             onError?((error as? LocalizedError)?.errorDescription ?? "This game couldn't be started.")
             return
         }
-        onStarted?(core.videoSize.width, core.videoSize.height, Self.romCRC(core, rom: rom))
+        onStarted?(core.videoSize.width, core.videoSize.height, Self.romCRC(core, rom: rom), core.stateVersion)
 
         var lastSize = core.videoSize
         let basePeriod = 1.0 / core.frameRate

@@ -12,10 +12,10 @@ struct AboutView: View {
     }
 
     private let licences = [
-        Licence(id: "mgba", title: "mGBA", detail: "Game Boy Advance core · MPL-2.0 · github.com/mgba-emu/mgba (source of the version we use is unmodified)",
+        Licence(id: "mgba", title: "mGBA", detail: "Game Boy Advance core · MPL-2.0 · an unmodified copy of commit 662dada; its source is at github.com/mgba-emu/mgba/tree/662dada",
                 file: "Licence-mGBA-MPL-2.0"),
         Licence(id: "inih", title: "inih", detail: "Part of mGBA · BSD 3-Clause", file: "Licence-inih-BSD-3-Clause"),
-        Licence(id: "ares", title: "ares", detail: "SNES and Mega Drive cores · ISC, with MAME-derived parts under BSD 3-Clause · github.com/ares-emulator/ares",
+        Licence(id: "ares", title: "ares", detail: "SNES and Mega Drive cores · ISC, with MAME-derived parts under BSD 3-Clause · commit 0b92893, github.com/ares-emulator/ares",
                 file: "Licence-ares-ISC-and-bundled"),
         Licence(id: "qon", title: "qon", detail: "Part of ares · MIT", file: "Licence-qon-MIT"),
     ]

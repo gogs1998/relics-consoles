@@ -40,7 +40,7 @@ targets:
             cp "${SRCROOT}"/TestROMs/build/*.nes "${SRCROOT}"/TestROMs/build/*.gb "${SRCROOT}"/TestROMs/build/*.gbc "${SRCROOT}"/TestROMs/build/*.gba "${SRCROOT}"/TestROMs/build/*.sfc "${SRCROOT}"/TestROMs/build/*.md "${APP}/TestCarts/" 2>/dev/null || true
           else
             rm -rf "${APP}/TestCarts"
-            FOUND=$(find "${APP}" \( -iname '*.nes' -o -iname '*.gb' -o -iname '*.gbc' -o -iname '*.gba' -o -iname '*.sfc' -o -iname '*.smc' -o -iname '*.md' -o -iname '*.gen' -o -iname '*.smd' -o -iname '*.zip' \) -not -path '*/Licenses/*' | head -1)
+            FOUND=$(find "${APP}" \( -iname '*.nes' -o -iname '*.gb' -o -iname '*.gbc' -o -iname '*.gba' -o -iname '*.sfc' -o -iname '*.smc' -o -iname '*.md' -o -iname '*.gen' -o -iname '*.smd' -o -iname '*.zip' -o -iname '*.bin' -o -iname '*.rom' -o -iname '*.bios' \) -not -path '*/Licences/*' | head -1)
             if [ -n "${FOUND}" ]; then echo "error: ROM file inside a Release bundle: ${FOUND}"; exit 1; fi
           fi
     settings:

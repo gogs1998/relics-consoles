@@ -39,26 +39,29 @@ const unsigned char kBoards[] = {
 #embed "../../ares/mia/Database/Super Famicom Boards.bml"
 };
 
-// Our own SPC700 boot program (not Nintendo's IPL ROM, which we never ship). Written from the
-// publicly documented upload protocol: report $AA/$BB on ports 0/1, wait for $CC, then repeatedly
-// take a destination from ports 2/3 and a command from port 1; a non-zero command receives a block
-// of bytes (index on port 0 echoed back, data on port 1), zero jumps to the destination.
-// Entry $FFC0 (reset vector at $FFFE). Assembly:
-//   FFC0 mov x,#$EF / mov sp,x / mov a,#0
-//   FFC5 clr: mov (x),a / dec x / bne clr          ; clear $01-$EF
-//   FFC9 mov $F4,#$AA / mov $F5,#$BB
-//   FFCF wcc: cmp $F4,#$CC / bne wcc
-//   FFD4 block: movw ya,$F6 / movw $00,ya / mov x,$F4 / mov a,$F5 / mov $F4,x / beq run
-//   FFE0 start: mov y,$F4 / bne start              ; first index is always 0
-//   FFE4 byte: cmp y,$F4 / bne check / mov a,$F5 / mov $F4,y / mov [$00]+y,a / inc y / bne byte
-//   FFF1 inc $01 / bra byte
-//   FFF5 check: bpl byte / bra block               ; port 0 ahead of the index: a new block
-//   FFF9 run: mov x,a / jmp [$0000+x]
+// Our own SPC700 boot program, written for this project (not Nintendo's IPL ROM, which we never
+// ship). It implements only the publicly documented upload handshake, with its own structure:
+// no RAM clear, stack at $FF, destination pointer in $02/$03, and a single data loop that tells
+// "not yet" (port 0 still holds the previous index) from "new command" (anything else).
+// Protocol: show $AA/$BB on ports 0/1; wait for $CC; each command = destination on ports 2/3,
+// command on port 1 (0 = jump there, else receive a block), kick value on port 0 which is echoed;
+// block bytes arrive on port 1 tagged with an 8-bit index on port 0, each index echoed back.
+// Entry $FFC0 (reset vector at $FFFE). Port 0 is read once per decision (the CPU can change it
+// at any moment).
+//   FFC0 mov x,#$FF / mov sp,x
+//   FFC3 mov $F4,#$AA / mov $F5,#$BB
+//   FFC9 cmp $F4,#$CC / bne FFC9
+//   FFCE cmd:   movw ya,$F6 / movw $02,ya / mov a,$F4 / mov x,$F5 / mov $F4,a / beq run
+//   FFDA        mov y,#0
+//   FFDC first: cmp y,$F4 / bne first
+//   FFE0 got:   mov a,$F5 / mov [$02]+y,a / mov $F4,y / inc y / bne wait / inc $03
+//   FFEB wait:  cmp y,$F4 / beq got / bmi cmd / bra wait   ; ahead of us = a new command
+//   FFF3 run:   jmp [$0002+x]            ; x = 0 here
 const unsigned char kBootProgram[64] = {
-  0xCD, 0xEF, 0xBD, 0xE8, 0x00, 0xC6, 0x1D, 0xD0, 0xFC, 0x8F, 0xAA, 0xF4, 0x8F, 0xBB, 0xF5, 0x78,
-  0xCC, 0xF4, 0xD0, 0xFB, 0xBA, 0xF6, 0xDA, 0x00, 0xF8, 0xF4, 0xE4, 0xF5, 0xD8, 0xF4, 0xF0, 0x19,
-  0xEB, 0xF4, 0xD0, 0xFC, 0x7E, 0xF4, 0xD0, 0x0D, 0xE4, 0xF5, 0xCB, 0xF4, 0xD7, 0x00, 0xFC, 0xD0,
-  0xF3, 0xAB, 0x01, 0x2F, 0xEF, 0x10, 0xED, 0x2F, 0xDB, 0x5D, 0x1F, 0x00, 0x00, 0x00, 0xC0, 0xFF,
+  0xCD, 0xFF, 0xBD, 0x8F, 0xAA, 0xF4, 0x8F, 0xBB, 0xF5, 0x78, 0xCC, 0xF4, 0xD0, 0xFB, 0xBA, 0xF6,
+  0xDA, 0x02, 0xE4, 0xF4, 0xF8, 0xF5, 0xC4, 0xF4, 0xF0, 0x19, 0x8D, 0x00, 0x7E, 0xF4, 0xD0, 0xFC,
+  0xE4, 0xF5, 0xD7, 0x02, 0xCB, 0xF4, 0xFC, 0xD0, 0x02, 0xAB, 0x03, 0x7E, 0xF4, 0xF0, 0xF1, 0x30,
+  0xDD, 0x2F, 0xF8, 0x1F, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0xFF,
 };
 
 struct Memory {

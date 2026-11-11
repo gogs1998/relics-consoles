@@ -10,6 +10,8 @@ final class AudioOutput {
     private(set) var isRunning = false
     /// Bumped by start/stop so a slow session activation can't start a stopped engine.
     private var generation = 0
+    private var ring: AudioRing?
+    private var observers: [NSObjectProtocol] = []
     nonisolated static let log = Logger(subsystem: "com.iqlabs.duoemulator", category: "audio")
 
     /// Built outside any actor: a closure written in a @MainActor method inherits main-actor
@@ -43,6 +45,17 @@ final class AudioOutput {
     }
 
     private func startEngine(ring: AudioRing, generation g: Int) {
+        self.ring = ring
+        if observers.isEmpty {
+            let c = NotificationCenter.default
+            // A route change (headphones, Bluetooth) stops the engine; media-services reset kills it.
+            observers.append(c.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.restart() }
+            })
+            observers.append(c.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.restart() }
+            })
+        }
         guard g == generation, let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1) else { return }
         let node = Self.makeNode(ring: ring, format: format)
         self.node = node
@@ -57,6 +70,12 @@ final class AudioOutput {
             isRunning = false
             Self.log.error("audio engine failed to start: \(error.localizedDescription)")
         }
+    }
+
+    /// Rebuilds the engine after a configuration change or a media-services reset.
+    func restart() {
+        guard let ring else { return }
+        start(ring: ring)
     }
 
     func stop() {

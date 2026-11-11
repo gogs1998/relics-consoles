@@ -163,7 +163,8 @@ final class GameStore {
     private func importOne(_ url: URL) throws -> Bool {
         let name = url.lastPathComponent
         guard let data = try? Data(contentsOf: url) else { throw ImportError.unreadable(name) }
-        guard data.count >= 16, data.count <= 16 * 1024 * 1024,
+        // Largest real cartridges: 32 MB (GBA), 8 MB (SNES), a few MB for the rest.
+        guard data.count >= 16, data.count <= 32 * 1024 * 1024,
               let system = CoreFactory.detect(rom: data, fileExtension: url.pathExtension) else {
             throw ImportError.notAGame(name)
         }
@@ -214,6 +215,8 @@ final class GameStore {
 
     func openURL(_ url: URL) {
         importFiles([url])
+        // "Open in" copies land in Documents/Inbox: don't import them again next launch.
+        if url.path.contains("/Documents/Inbox/") { try? FileManager.default.removeItem(at: url) }
     }
 
     // MARK: edits

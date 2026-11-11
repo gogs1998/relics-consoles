@@ -189,13 +189,14 @@ enum ControllerLayout {
     }
 
     /// Book pose, left page: the D-pad under the game (and L).
-    static func bookLeft(_ size: CGSize, system: SystemID) -> [Control] {
+    static func bookLeft(_ size: CGSize, system: SystemID, sixButton: Bool = false) -> [Control] {
         let w = size.width, h = size.height
         let dpad = min(w * 0.52, h * 0.85)
         let pillW: CGFloat = 60
         var c = [Control(kind: .dpad, frame: CGRect(x: w * 0.42 - dpad / 2, y: h * 0.5 - dpad / 2, width: dpad, height: dpad))]
-        if system != .md {
-            c.append(Control(kind: .pill(.select, "SELECT"), frame: CGRect(x: w - pillW - 18, y: h * 0.5 - 10, width: pillW, height: 20)))
+        if system != .md || sixButton {
+            c.append(Control(kind: .pill(.select, system == .md ? "MODE" : "SELECT"),
+                             frame: CGRect(x: w - pillW - 18, y: h * 0.5 - 10, width: pillW, height: 20)))
         }
         if hasShoulders(system) {
             c.append(Control(kind: .shoulder(.l, "L"), frame: CGRect(x: 10, y: 4, width: min(120, w * 0.3), height: 28)))
@@ -226,8 +227,9 @@ enum ControllerLayout {
         c.append(Control(kind: .dpad, frame: CGRect(x: side * 0.5 - dpad / 2, y: h * 0.58 - dpad / 2, width: dpad, height: dpad)))
         let rx = w - side * 0.5
         c += faceCluster(system, centre: CGPoint(x: rx, y: h * 0.6), diameter: face, sixButton: sixButton)
-        if system != .md {
-            c.append(Control(kind: .pill(.select, "SELECT"), frame: CGRect(x: side * 0.5 - 30, y: h - 40, width: 60, height: 20)))
+        if system != .md || sixButton {
+            c.append(Control(kind: .pill(.select, system == .md ? "MODE" : "SELECT"),
+                             frame: CGRect(x: side * 0.5 - 30, y: h - 40, width: 60, height: 20)))
         }
         c.append(Control(kind: .pill(.start, "START"), frame: CGRect(x: rx - 30, y: h - 40, width: 60, height: 20)))
         if hasShoulders(system) {
