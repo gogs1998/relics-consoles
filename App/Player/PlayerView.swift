@@ -86,11 +86,11 @@ struct PlayerView: View {
         let rightPad = CGRect(x: right.minX, y: rightTop.maxY + 4, width: right.width, height: right.maxY - rightTop.maxY - 8)
         return ZStack(alignment: .topLeading) {
             screen(in: leftScreen)
-            ControllerView(controls: ControllerLayout.bookLeft(leftPad.size), model: model.controller)
+            ControllerView(controls: ControllerLayout.bookLeft(leftPad.size, system: model.game.system), model: model.controller)
                 .place(leftPad)
             HingeSeam(axis: .vertical).place(stage.fold.frame)
             CompanionPage(model: model, onQuit: onQuit).place(rightTop)
-            ControllerView(controls: ControllerLayout.bookRight(rightPad.size), model: model.controller)
+            ControllerView(controls: ControllerLayout.bookRight(rightPad.size, system: model.game.system, sixButton: model.sixButtonPad), model: model.controller)
                 .place(rightPad)
             if model.menuOpen { menuPanel.place(right.insetBy(dx: 10, dy: 10)) }
         }
@@ -118,7 +118,7 @@ struct PlayerView: View {
             GameScreen(frames: model.session.frames, mode: model.screenMode, integer: fit.integer)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .place(game)
-            ControllerView(controls: ControllerLayout.overlay(c.size, gameRect: game.offsetBy(dx: -c.minX, dy: -c.minY)),
+            ControllerView(controls: ControllerLayout.overlay(c.size, gameRect: game.offsetBy(dx: -c.minX, dy: -c.minY), system: model.game.system, sixButton: model.sixButtonPad),
                            model: model.controller, floating: false)
                 .place(c)
             toastView.place(CGRect(x: game.minX, y: game.minY + 10, width: game.width, height: 40))
@@ -139,7 +139,7 @@ struct PlayerView: View {
         ZStack(alignment: .topLeading) {
             VentSlots(columns: 5)
                 .position(x: rect.width * 0.86, y: rect.height * 0.88)
-            ControllerView(controls: ControllerLayout.deck(rect.size, system: model.game.system), model: model.controller)
+            ControllerView(controls: ControllerLayout.deck(rect.size, system: model.game.system, sixButton: model.sixButtonPad), model: model.controller)
         }
         .place(rect)
     }

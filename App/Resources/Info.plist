@@ -51,6 +51,12 @@
 				<string>com.iqlabs.duoemulator.nes</string>
 				<string>com.iqlabs.duoemulator.gb</string>
 				<string>com.iqlabs.duoemulator.gbc</string>
+				<string>com.iqlabs.duoemulator.gba</string>
+				<string>com.iqlabs.duoemulator.sfc</string>
+				<string>com.iqlabs.duoemulator.smc</string>
+				<string>com.iqlabs.duoemulator.md</string>
+				<string>com.iqlabs.duoemulator.gen</string>
+				<string>com.iqlabs.duoemulator.smd</string>
 			</array>
 		</dict>
 	</array>
@@ -85,6 +91,66 @@
 			<array><string>public.data</string></array>
 			<key>UTTypeTagSpecification</key>
 			<dict><key>public.filename-extension</key><array><string>gbc</string></array></dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.iqlabs.duoemulator.gba</string>
+			<key>UTTypeDescription</key>
+			<string>Game Boy Advance game file</string>
+			<key>UTTypeConformsTo</key>
+			<array><string>public.data</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict><key>public.filename-extension</key><array><string>gba</string></array></dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.iqlabs.duoemulator.sfc</string>
+			<key>UTTypeDescription</key>
+			<string>SNES game file</string>
+			<key>UTTypeConformsTo</key>
+			<array><string>public.data</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict><key>public.filename-extension</key><array><string>sfc</string></array></dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.iqlabs.duoemulator.smc</string>
+			<key>UTTypeDescription</key>
+			<string>SNES game file</string>
+			<key>UTTypeConformsTo</key>
+			<array><string>public.data</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict><key>public.filename-extension</key><array><string>smc</string></array></dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.iqlabs.duoemulator.md</string>
+			<key>UTTypeDescription</key>
+			<string>Mega Drive game file</string>
+			<key>UTTypeConformsTo</key>
+			<array><string>public.data</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict><key>public.filename-extension</key><array><string>md</string></array></dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.iqlabs.duoemulator.gen</string>
+			<key>UTTypeDescription</key>
+			<string>Genesis game file</string>
+			<key>UTTypeConformsTo</key>
+			<array><string>public.data</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict><key>public.filename-extension</key><array><string>gen</string></array></dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.iqlabs.duoemulator.smd</string>
+			<key>UTTypeDescription</key>
+			<string>Mega Drive game file</string>
+			<key>UTTypeConformsTo</key>
+			<array><string>public.data</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict><key>public.filename-extension</key><array><string>smd</string></array></dict>
 		</dict>
 	</array>
 	<key>UILaunchScreen</key>

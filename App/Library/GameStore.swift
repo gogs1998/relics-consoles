@@ -23,7 +23,7 @@ enum ImportError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .notAGame(let name): "\(name) isn't a game file this app can play (NES, Game Boy or Game Boy Color)."
+        case .notAGame(let name): "\(name) isn't a game file this app can play (NES, SNES, Game Boy, Game Boy Color, Game Boy Advance or Mega Drive)."
         case .unreadable(let name): "\(name) couldn't be read."
         }
     }
@@ -102,6 +102,9 @@ final class GameStore {
         case .nes: "NES"
         case .gb: "Game Boy"
         case .gbc: "Game Boy Color"
+        case .gba: "Game Boy Advance"
+        case .snes: "SNES"
+        case .md: "Mega Drive"
         }
     }
 
@@ -255,6 +258,8 @@ final class GameStore {
             "gb_selftest.gb": "Test Cart: Pocket CPU Check", "gb_cgbtest.gbc": "Test Cart: Pocket Colour Check",
             "mmc1_probe.nes": "Test Cart: MMC1 Probe", "uxrom_probe.nes": "Test Cart: UxROM Probe",
             "cnrom_probe.nes": "Test Cart: CNROM Probe", "mmc3_probe.nes": "Test Cart: MMC3 Probe",
+            "gba_demo.gba": "Test Cart: Advance Square", "ares_snes_demo.sfc": "Test Cart: Sixteen Blue",
+            "ares_md_demo.md": "Test Cart: Mega Tone",
         ]
         for url in files.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
             guard let data = try? Data(contentsOf: url),

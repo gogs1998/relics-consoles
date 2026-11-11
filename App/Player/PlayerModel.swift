@@ -25,6 +25,10 @@ final class PlayerModel {
     private(set) var slotDates: [Int: Date] = [:]
     /// DEBUG: "samplesPulled peak" for the UI test.
     private(set) var audioStats = "0 0"
+    /// Mega Drive: show the six-button pad (X Y Z, Mode) instead of the three-button one.
+    var sixButtonPad = UserDefaults.standard.bool(forKey: "md.sixButton") {
+        didSet { UserDefaults.standard.set(sixButtonPad, forKey: "md.sixButton") }
+    }
     var screenMode: ScreenMode {
         didSet { UserDefaults.standard.set(screenMode.rawValue, forKey: "screenMode.\(game.system.rawValue)") }
     }
@@ -51,7 +55,6 @@ final class PlayerModel {
         screenMode = saved.flatMap(ScreenMode.init(rawValue:)) ?? .auto
     }
 
-    var pixelAspect: Double { 1 }
 
     func start(resume autoResume: Bool) {
         controller.latch = session.input
@@ -72,6 +75,12 @@ final class PlayerModel {
                 self?.romCRC = crc
                 self?.started = true
                 if autoResume { self?.resumeAutoState() }
+            }
+        }
+        session.onVideoSize = { [weak self] w, h in
+            Task { @MainActor in
+                // SNES hi-res frames are twice as wide but show the same picture shape.
+                self?.videoSize = CGSize(width: w >= 512 ? w / 2 : w, height: h >= 448 ? h / 2 : h)
             }
         }
         session.start()

@@ -23,6 +23,9 @@ enum Theme {
         case .nes: Color(red: 0.88, green: 0.64, blue: 0.23)    // saffron
         case .gb: Color(red: 0.36, green: 0.48, blue: 0.60)     // slate
         case .gbc: Color(red: 0.91, green: 0.43, blue: 0.35)    // coral
+        case .gba: Color(red: 0.42, green: 0.62, blue: 0.52)    // sage
+        case .snes: Color(red: 0.80, green: 0.55, blue: 0.70)   // heather
+        case .md: Color(red: 0.30, green: 0.36, blue: 0.48)     // ink blue
         }
     }
 

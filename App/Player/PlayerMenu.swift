@@ -40,6 +40,14 @@ struct PlayerMenu: View {
                     }
                 }
             }
+            if model.game.system == .md {
+                Toggle(isOn: Binding(get: { model.sixButtonPad }, set: { model.sixButtonPad = $0 })) {
+                    Text("Six-button pad")
+                        .font(.rounded(.footnote, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                }
+                .tint(Theme.ember)
+            }
             HStack(spacing: 8) {
                 Button { model.reset() } label: { Label("Reset", systemImage: "arrow.counterclockwise") }
                     .buttonStyle(ChipStyle(selected: false))

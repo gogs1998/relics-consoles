@@ -30,6 +30,8 @@ struct ControllerView: View {
             FaceButtonView(label: label, tone: tone, pressed: model.pressed.contains(s))
         case .pill(let s, let label):
             PillKeyView(label: label, pressed: model.pressed.contains(s))
+        case .shoulder(let s, let label):
+            ShoulderView(label: label, pressed: model.pressed.contains(s))
         case .menu:
             RoundKeyView(symbol: "ellipsis", label: "Menu", pressed: model.menuDown)
         case .fastForward:
@@ -271,6 +273,36 @@ struct RoundKeyView: View {
         .animation(.easeOut(duration: 0.08), value: pressed)
         .accessibilityElement()
         .accessibilityLabel(label)
+    }
+}
+
+/// L / R: a long, low tab along the top edge, sculpted toward the outside.
+struct ShoulderView: View {
+    var label: String
+    var pressed: Bool
+
+    var body: some View {
+        ZStack {
+            UnevenRoundedRectangle(cornerRadii: .init(topLeading: label == "L" ? 16 : 6, bottomLeading: 6,
+                                                      bottomTrailing: 6, topTrailing: label == "L" ? 6 : 16),
+                                   style: .continuous)
+                .fill(LinearGradient(colors: [Color(white: pressed ? 0.2 : 0.3), Color(white: 0.14)],
+                                     startPoint: .top, endPoint: .bottom))
+                .overlay(
+                    UnevenRoundedRectangle(cornerRadii: .init(topLeading: label == "L" ? 16 : 6, bottomLeading: 6,
+                                                              bottomTrailing: 6, topTrailing: label == "L" ? 6 : 16),
+                                           style: .continuous)
+                        .stroke(Color.white.opacity(0.12), lineWidth: 0.8)
+                )
+                .shadow(color: .black.opacity(0.5), radius: pressed ? 1 : 4, y: pressed ? 1 : 3)
+            Text(label)
+                .font(.rounded(.footnote, weight: .heavy))
+                .foregroundStyle(pressed ? Theme.ember : Theme.inkDim)
+        }
+        .offset(y: pressed ? 1.5 : 0)
+        .animation(.easeOut(duration: 0.08), value: pressed)
+        .accessibilityElement()
+        .accessibilityLabel("\(label) shoulder button")
     }
 }
 

@@ -91,7 +91,7 @@ struct TouchSurface: UIViewRepresentable {
                     guard r.contains(p) else { continue }
                     switch c.kind {
                     case .dpad: return .dpad
-                    case .face: return .buttons
+                    case .face, .shoulder: return .buttons
                     case .pill(let s, _): return .pill(s)
                     case .menu: return .menu
                     case .fastForward: return .fastForward
@@ -116,10 +116,18 @@ struct TouchSurface: UIViewRepresentable {
                     vector = v
                 case .buttons:
                     for c in controls {
-                        guard case .face(let s, _, _) = c.kind else { continue }
-                        let centre = CGPoint(x: c.frame.midX, y: c.frame.midY)
-                        let r = c.frame.width * 0.5 * 1.3
-                        if hypot(p.x - centre.x, p.y - centre.y) <= r { pressed.insert(s) }
+                        switch c.kind {
+                        case .face(let s, _, _):
+                            let centre = CGPoint(x: c.frame.midX, y: c.frame.midY)
+                            // Generous for two buttons; tighter for crowded clusters so a thumb
+                            // between three or four buttons doesn't press them all.
+                            let reach = controls.filter { if case .face = $0.kind { true } else { false } }.count > 2 ? 1.1 : 1.3
+                            let r = c.frame.width * 0.5 * reach
+                            if hypot(p.x - centre.x, p.y - centre.y) <= r { pressed.insert(s) }
+                        case .shoulder(let s, _):
+                            if c.hitFrame.contains(p) { pressed.insert(s) }
+                        default: break
+                        }
                     }
                 case .pill(let s):
                     if let c = controls.first(where: { if case .pill(s, _) = $0.kind { true } else { false } }),

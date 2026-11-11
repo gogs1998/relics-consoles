@@ -29,11 +29,33 @@ let mgbaC: [CSetting] = [
     .unsafeFlags(["-O2", "-std=gnu11", "-w"]),
 ]
 
+// ares (ISC), SNES and Mega Drive cores, vendored unmodified in Sources/ARES/ares (see
+// ThirdParty/ares/README.md). Only our own build units (Sources/ARES/glue/units, glue/src) are
+// compiled; they #include the upstream files. glue/shim comes first on the include path and
+// replaces three generated/JIT headers (sljit.h, nall's recompiler, the resource header).
+// No sljit, no recompiler, no executable memory (see glue/shim/ares_prelude.h).
+let aresPaths: [String] = ["glue/shim", "glue/include", "ares/ares", "ares/nall", "ares", "ares/thirdparty"]
+let aresCXX: [CXXSetting] = aresPaths.map { .headerSearchPath($0) } + [
+    .define("PROFILE_PERFORMANCE"),
+    .define("CORE_SFC"),
+    .define("CORE_MD"),
+    .define("BUILD_RELEASE"),
+    .define("NDEBUG"),
+    // Optimised even in Debug (like the other cores); upstream's own warnings are not ours to fix.
+    .unsafeFlags(["-O2", "-w", "-fno-strict-aliasing"]),
+]
+let aresC: [CSetting] = [
+    .define("LIBCO_MP"),  // libco's active-context pointer is thread-local
+    .unsafeFlags(["-O2", "-w"]),
+]
+
 let package = Package(
     name: "CoreKit",
     platforms: [.iOS("26.0"), .macOS("26.0")],
     products: [
         .library(name: "CoreKit", targets: ["CoreKit", "NESCore", "GBCore", "GBACore"]),
+        // Separate product so the app opts in when it wires the new systems up.
+        .library(name: "AresCore", targets: ["AresCore"]),
     ],
     targets: [
         .target(name: "CoreKit", swiftSettings: fast),
@@ -41,6 +63,10 @@ let package = Package(
         .target(name: "GBCore", dependencies: ["CoreKit"], swiftSettings: fast),
         .target(name: "MGBA", publicHeadersPath: "glue/include", cSettings: mgbaC),
         .target(name: "GBACore", dependencies: ["CoreKit", "MGBA"], swiftSettings: fast),
-        .testTarget(name: "CoreKitTests", dependencies: ["CoreKit", "NESCore", "GBCore", "GBACore"]),
-    ]
+        .target(name: "ARES", sources: ["glue/units", "glue/src"], publicHeadersPath: "glue/include",
+                cSettings: aresC, cxxSettings: aresCXX),
+        .target(name: "AresCore", dependencies: ["CoreKit", "ARES"], swiftSettings: fast),
+        .testTarget(name: "CoreKitTests", dependencies: ["CoreKit", "NESCore", "GBCore", "GBACore", "AresCore"]),
+    ],
+    cxxLanguageStandard: .cxx20
 )

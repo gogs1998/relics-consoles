@@ -6,6 +6,8 @@ public enum SystemID: String, Codable, Sendable, CaseIterable, Identifiable {
     case gb
     case gbc
     case gba
+    case snes
+    case md
 
     public var id: String { rawValue }
 
@@ -16,6 +18,8 @@ public enum SystemID: String, Codable, Sendable, CaseIterable, Identifiable {
         case .gb: "Game Boy"
         case .gbc: "Game Boy Color"
         case .gba: "Game Boy Advance"
+        case .snes: "SNES"
+        case .md: "Mega Drive / Genesis"
         }
     }
 
@@ -25,6 +29,8 @@ public enum SystemID: String, Codable, Sendable, CaseIterable, Identifiable {
         case .gb: ["gb"]
         case .gbc: ["gbc"]
         case .gba: ["gba"]
+        case .snes: ["sfc", "smc"]
+        case .md: ["md", "gen", "bin", "smd"]
         }
     }
 
@@ -104,6 +110,8 @@ public protocol EmulatorCore: AnyObject {
     var framebuffer: UnsafeBufferPointer<UInt32> { get }
     /// Moves every sample produced since the last call into `ring`.
     func drainAudio(into ring: AudioRing)
+    /// Throws away pending samples (fast-forward, rewind).
+    func discardAudio()
     /// Battery-backed cartridge RAM, or nil if the cartridge has none.
     var batteryRAM: Data? { get }
     func saveState() -> Data
@@ -128,6 +136,12 @@ public enum CoreFactory {
                 if chk &- 0x19 == rom[b + 0xBD] { return .gba }
             }
         }
+        // Mega Drive: "SEGA" at $100 (the console's own cartridge check string).
+        if rom.count >= 0x200, rom[rom.startIndex + 0x100] == 0x53, rom[rom.startIndex + 0x101] == 0x45,
+           rom[rom.startIndex + 0x102] == 0x47, rom[rom.startIndex + 0x103] == 0x41 {
+            return .md
+        }
+        if snesHeaderValid(rom) { return .snes }
         if rom.count >= 0x150 {
             // Game Boy cartridge header: check the header checksum at $14D.
             var sum: UInt8 = 0
@@ -142,7 +156,26 @@ public enum CoreFactory {
         case "gb": return .gb
         case "gbc": return .gbc
         case "gba": return .gba
+        case "sfc", "smc": return .snes
+        // ".bin" is ambiguous (many systems use it): only claimed above, by the "SEGA" header.
+        case "md", "gen", "smd": return .md
         default: return nil
         }
+    }
+
+    /// SNES internal header: checksum + complement == $FFFF at $7FDC (LoROM) or $FFDC (HiROM),
+    /// with or without a 512-byte copier header, plus a plausible map mode byte.
+    static func snesHeaderValid(_ rom: Data) -> Bool {
+        let skip = rom.count % 0x8000 == 512 ? 512 : 0
+        for header in [0x7FB0, 0xFFB0] {
+            let base = rom.startIndex + skip + header
+            guard rom.count >= skip + header + 0x50 else { continue }
+            let complement = UInt16(rom[base + 0x2C]) | UInt16(rom[base + 0x2D]) << 8
+            let checksum = UInt16(rom[base + 0x2E]) | UInt16(rom[base + 0x2F]) << 8
+            let mapMode = rom[base + 0x25] & 0xEF
+            let reset = UInt16(rom[base + 0x4C]) | UInt16(rom[base + 0x4D]) << 8
+            if checksum ^ complement == 0xFFFF, (0x20...0x2A).contains(mapMode), reset >= 0x8000 { return true }
+        }
+        return false
     }
 }

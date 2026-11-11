@@ -10,6 +10,7 @@ struct LibraryView: View {
     var onPlay: (GameRecord) -> Void
 
     @State private var importing = false
+    @State private var showingAbout = false
     @State private var selected: GameRecord.ID?
     @State private var renaming: GameRecord?
     @State private var newTitle = ""
@@ -36,6 +37,7 @@ struct LibraryView: View {
             }
         }
         .frame(width: stage.bounds.width, height: stage.bounds.height)
+        .sheet(isPresented: $showingAbout) { AboutView() }
         .fileImporter(isPresented: $importing, allowedContentTypes: Self.importTypes, allowsMultipleSelection: true) { result in
             if case .success(let urls) = result { store.importFiles(urls) }
         }
@@ -62,7 +64,7 @@ struct LibraryView: View {
     }
 
     static var importTypes: [UTType] {
-        let ids = ["com.iqlabs.duoemulator.nes", "com.iqlabs.duoemulator.gb", "com.iqlabs.duoemulator.gbc"]
+        let ids = ["nes", "gb", "gbc", "gba", "sfc", "smc", "md", "gen", "smd"].map { "com.iqlabs.duoemulator.\($0)" }
         return ids.compactMap { UTType($0) } + [.data]
     }
 
@@ -121,6 +123,11 @@ struct LibraryView: View {
                 }
             }
             Spacer()
+            Button { showingAbout = true } label: {
+                Image(systemName: "info.circle").font(.rounded(.title3)).foregroundStyle(Theme.inkDim)
+            }
+            .accessibilityLabel("About and acknowledgements")
+            .padding(.trailing, 6)
             Button { importing = true } label: { Label("Add games", systemImage: "plus") }
                 .buttonStyle(EmberButtonStyle())
         }
@@ -259,27 +266,129 @@ struct GameCard: View {
     }
 }
 
-/// A stand-in label for games not played yet: stripes and a sun, varied per game.
+/// A generated label for games not played yet: one of eight motifs, its own colours and
+/// layout, all derived from the game's id, so every card on the shelf looks different.
 struct LabelPattern: View {
     let seed: String
     let tint: Color
 
+    private var hash: UInt64 {
+        seed.unicodeScalars.reduce(UInt64(1469598103934665603)) { ($0 ^ UInt64($1.value)) &* 1099511628211 }
+    }
+
     var body: some View {
-        let h = seed.unicodeScalars.reduce(UInt32(2166136261)) { ($0 ^ $1.value) &* 16777619 }
+        let h = hash
+        // Shift the system tint's hue a little per game, and pick a ground and an accent.
+        let hueShift = Double((h >> 8) % 60) / 360 - 30.0 / 360
+        let base = tint.rotatedHue(by: hueShift)
+        let accent = Theme.sand.rotatedHue(by: Double((h >> 20) % 40) / 360 - 20.0 / 360)
+        let ground = (h >> 30) % 3 == 0 ? Color(white: 0.92) : Color(white: 0.11)
+        let motif = Int(h % 8)
         Canvas { ctx, size in
-            ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(Color(white: 0.12)))
-            let stripes = 4 + Int(h % 4)
-            let sh = size.height / CGFloat(stripes * 2)
-            for i in 0..<stripes {
-                let y = size.height * 0.55 + CGFloat(i) * sh * 1.2
-                ctx.fill(Path(CGRect(x: 0, y: y, width: size.width, height: sh * 0.6)),
-                         with: .color(tint.opacity(0.85 - Double(i) * 0.15)))
+            let w = size.width, hh = size.height
+            ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(ground))
+            var rng = SplitMix(seed: h)
+            switch motif {
+            case 0: // sun and stripes
+                let n = 4 + Int(rng.next() % 4)
+                let sh = hh / CGFloat(n * 2)
+                for i in 0..<n {
+                    let y = hh * 0.55 + CGFloat(i) * sh * 1.2
+                    ctx.fill(Path(CGRect(x: 0, y: y, width: w, height: sh * 0.6)), with: .color(base.opacity(0.9 - Double(i) * 0.15)))
+                }
+                let r = hh * 0.2, cx = w * (0.25 + rng.unit() * 0.5)
+                ctx.fill(Path(ellipseIn: CGRect(x: cx - r, y: hh * 0.45 - r * 1.6, width: r * 2, height: r * 2)), with: .color(accent))
+            case 1: // mountains
+                for layer in 0..<3 {
+                    var p = Path()
+                    let baseY = hh * (0.55 + CGFloat(layer) * 0.15)
+                    p.move(to: CGPoint(x: 0, y: hh))
+                    var x: CGFloat = 0
+                    p.addLine(to: CGPoint(x: 0, y: baseY))
+                    while x < w {
+                        let peak = baseY - hh * (0.12 + rng.unit() * 0.25)
+                        p.addLine(to: CGPoint(x: x + w * 0.12, y: peak))
+                        x += w * 0.24
+                        p.addLine(to: CGPoint(x: x, y: baseY))
+                    }
+                    p.addLine(to: CGPoint(x: w, y: hh))
+                    ctx.fill(p, with: .color(base.opacity(0.45 + Double(layer) * 0.25)))
+                }
+                ctx.fill(Path(ellipseIn: CGRect(x: w * 0.7, y: hh * 0.12, width: hh * 0.16, height: hh * 0.16)), with: .color(accent))
+            case 2: // plaid
+                let step = w / CGFloat(5 + rng.next() % 4)
+                var x: CGFloat = 0
+                while x < w { ctx.fill(Path(CGRect(x: x, y: 0, width: step * 0.35, height: hh)), with: .color(base.opacity(0.55))); x += step }
+                var y: CGFloat = 0
+                while y < hh { ctx.fill(Path(CGRect(x: 0, y: y, width: w, height: step * 0.35)), with: .color(accent.opacity(0.45))); y += step }
+            case 3: // waves
+                for i in 0..<6 {
+                    var p = Path()
+                    let y0 = hh * (0.2 + CGFloat(i) * 0.14)
+                    p.move(to: CGPoint(x: 0, y: y0))
+                    var x: CGFloat = 0
+                    while x <= w { p.addLine(to: CGPoint(x: x, y: y0 + sin(x / w * .pi * 4 + CGFloat(i)) * hh * 0.04)); x += 2 }
+                    ctx.stroke(p, with: .color(i % 2 == 0 ? base : accent), lineWidth: hh * 0.045)
+                }
+            case 4: // concentric rings
+                let c = CGPoint(x: w * (0.3 + rng.unit() * 0.4), y: hh * (0.3 + rng.unit() * 0.4))
+                for i in (1...7).reversed() {
+                    let r = CGFloat(i) * hh * 0.11
+                    ctx.fill(Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)),
+                             with: .color(i % 2 == 0 ? base : (i == 1 ? accent : ground)))
+                }
+            case 5: // diagonal bands
+                for i in -4..<10 {
+                    var p = Path()
+                    let x = CGFloat(i) * w * 0.16
+                    p.move(to: CGPoint(x: x, y: hh)); p.addLine(to: CGPoint(x: x + w * 0.08, y: hh))
+                    p.addLine(to: CGPoint(x: x + w * 0.08 + hh, y: 0)); p.addLine(to: CGPoint(x: x + hh, y: 0)); p.closeSubpath()
+                    ctx.fill(p, with: .color((i % 3 == 0 ? accent : base).opacity(0.85)))
+                }
+            case 6: // starfield and planet
+                for _ in 0..<40 {
+                    let r = 0.6 + rng.unit() * 1.4
+                    ctx.fill(Path(ellipseIn: CGRect(x: rng.unit() * w, y: rng.unit() * hh, width: r, height: r)), with: .color(accent))
+                }
+                let pr = hh * 0.28
+                let pc = CGPoint(x: w * (0.3 + rng.unit() * 0.4), y: hh * 0.55)
+                ctx.fill(Path(ellipseIn: CGRect(x: pc.x - pr, y: pc.y - pr, width: pr * 2, height: pr * 2)), with: .color(base))
+                ctx.stroke(Path(ellipseIn: CGRect(x: pc.x - pr * 1.6, y: pc.y - pr * 0.35, width: pr * 3.2, height: pr * 0.7)), with: .color(accent.opacity(0.8)), lineWidth: 2)
+            default: // pixel blocks
+                let cols = 8, rows = 6
+                let cw = w / CGFloat(cols), ch = hh / CGFloat(rows)
+                for r in 0..<rows { for c in 0..<cols where rng.next() % 3 == 0 {
+                    ctx.fill(Path(CGRect(x: CGFloat(c) * cw + 1, y: CGFloat(r) * ch + 1, width: cw - 2, height: ch - 2)),
+                             with: .color((rng.next() % 2 == 0 ? base : accent).opacity(0.9)))
+                } }
             }
-            let r = size.height * 0.22
-            let cx = size.width * (0.25 + CGFloat((h >> 8) % 50) / 100)
-            ctx.fill(Path(ellipseIn: CGRect(x: cx - r, y: size.height * 0.48 - r * 1.6, width: r * 2, height: r * 2)),
-                     with: .color(Theme.sand.opacity(0.9)))
         }
+    }
+}
+
+/// Small deterministic generator for the label art.
+struct SplitMix {
+    var state: UInt64
+    init(seed: UInt64) { state = seed }
+    mutating func next() -> UInt64 {
+        state &+= 0x9E3779B97F4A7C15
+        var z = state
+        z = (z ^ (z >> 30)) &* 0xBF58476D1CE4E5B9
+        z = (z ^ (z >> 27)) &* 0x94D049BB133111EB
+        return z ^ (z >> 31)
+    }
+    mutating func unit() -> CGFloat { CGFloat(next() % 10_000) / 10_000 }
+}
+
+extension Color {
+    /// The same colour with its hue turned by `amount` (0...1 = a full turn).
+    func rotatedHue(by amount: Double) -> Color {
+        let ui = UIColor(self)
+        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        ui.getHue(&h, saturation: &s, brightness: &b, alpha: &a)
+        var nh = h + CGFloat(amount)
+        nh -= floor(nh)
+        return Color(hue: Double(nh), saturation: Double(s), brightness: Double(b), opacity: Double(a))
     }
 }
 

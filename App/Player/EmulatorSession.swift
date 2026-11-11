@@ -1,5 +1,7 @@
+import AresCore
 import CoreKit
 import Foundation
+import GBACore
 import GBCore
 import NESCore
 import Synchronization
@@ -96,6 +98,8 @@ final class EmulatorSession: @unchecked Sendable {
     /// Reported back to the main actor.
     var onError: (@Sendable (String) -> Void)?
     var onStarted: (@Sendable (_ videoWidth: Int, _ videoHeight: Int, _ romCRC: UInt32) -> Void)?
+    /// The core changed resolution (Mega Drive 256/320 wide, SNES hi-res).
+    var onVideoSize: (@Sendable (_ videoWidth: Int, _ videoHeight: Int) -> Void)?
 
     // Emulation-thread state (touched only on that thread).
     private var paused = false
@@ -103,7 +107,7 @@ final class EmulatorSession: @unchecked Sendable {
     private var rewinding = false
     private var rewindStates: [Data] = []
     private var rewindBytes = 0
-    private let rewindCap = 8 * 1024 * 1024
+    private let rewindCap = 24 * 1024 * 1024
     private var frameCount = 0
 
     init(system: SystemID, rom: Data, battery: Data?) {
@@ -130,15 +134,29 @@ final class EmulatorSession: @unchecked Sendable {
         switch system {
         case .nes: return try NESSystem(rom: rom, battery: battery)
         case .gb, .gbc: return try GBSystem(rom: rom, battery: battery)
+        case .gba: return try GBASystem(rom: rom, battery: battery)
+        case .snes: return try SNESSystem(rom: rom, battery: battery)
+        case .md: return try MDSystem(rom: rom, battery: battery)
         }
     }
 
     private static func romCRC(_ core: any EmulatorCore, rom: Data) -> UInt32 {
         if let nes = core as? NESSystem { return nes.romCRC }
+        if let gb = core as? GBSystem { return gb.romCRC }
         return CRC32.checksum(rom)
     }
 
+    /// One live core per process: a quick quit-and-reopen waits for the old thread to let go
+    /// (ares keeps its console in process-wide state).
+    private static let coreGate = NSLock()
+
     private func run() {
+        Self.coreGate.lock()
+        defer { Self.coreGate.unlock() }
+        runCore()
+    }
+
+    private func runCore() {
         let core: any EmulatorCore
         do {
             core = try Self.makeCore(system: system, rom: rom, battery: battery)
@@ -148,6 +166,7 @@ final class EmulatorSession: @unchecked Sendable {
         }
         onStarted?(core.videoSize.width, core.videoSize.height, Self.romCRC(core, rom: rom))
 
+        var lastSize = core.videoSize
         let basePeriod = 1.0 / core.frameRate
         let targetFill = Double(core.audioSampleRate) * basePeriod * 3   // ~3 frames of audio queued
         var next = ProcessInfo.processInfo.systemUptime
@@ -207,12 +226,17 @@ final class EmulatorSession: @unchecked Sendable {
                 for i in 0..<speed {
                     core.runFrame(input: held)
                     frameCount += 1
-                    if frameCount % 4 == 0 { pushRewind(core.saveState()) }
+                    if frameCount % rewindInterval == 0 { pushRewind(core.saveState()) }
                     if i < speed - 1 { discardAudio(core) }
                 }
                 if speed == 1 { core.drainAudio(into: audio) } else { discardAudio(core) }
             }
-            frames.publish(core.framebuffer, width: core.videoSize.width, height: core.videoSize.height)
+            let size = core.videoSize
+            frames.publish(core.framebuffer, width: size.width, height: size.height)
+            if size != lastSize {
+                lastSize = size
+                onVideoSize?(size.width, size.height)
+            }
 
             // Dynamic rate control: lengthen or shorten the frame by up to 0.5 % to hold the
             // audio queue near its target.
@@ -228,12 +252,13 @@ final class EmulatorSession: @unchecked Sendable {
         }
     }
 
-    private func discardAudio(_ core: any EmulatorCore) {
-        if let nes = core as? NESSystem { nes.discardAudio() }
-        else if let gb = core as? GBSystem { gb.discardAudio() }
-    }
+    private func discardAudio(_ core: any EmulatorCore) { core.discardAudio() }
+
+    /// Big states (GBA ~400 KB) are snapshotted less often so rewind still reaches ~15 s back.
+    private var rewindInterval = 4
 
     private func pushRewind(_ state: Data) {
+        if state.count > 100_000 { rewindInterval = 15 }
         rewindStates.append(state)
         rewindBytes += state.count
         while rewindBytes > rewindCap, !rewindStates.isEmpty {
