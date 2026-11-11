@@ -50,6 +50,33 @@ final class ScreenshotUITests: XCTestCase {
         shoot("table-menu", args: ["-pose", "table", "-autoplay", "demo.nes", "-freshStart", "YES", "-openMenu", "YES"])
     }
 
+    @MainActor func testTableGBA() {
+        shoot("table-gba", args: ["-pose", "table", "-autoplay", "gba_demo.gba", "-freshStart", "YES"])
+    }
+
+    @MainActor func testTableSNES() {
+        shoot("table-snes", args: ["-pose", "table", "-autoplay", "ares_snes_demo.sfc", "-freshStart", "YES"])
+    }
+
+    @MainActor func testTableMegaDrive() {
+        shoot("table-md6", args: ["-pose", "table", "-autoplay", "ares_md_demo.md", "-freshStart", "YES", "-md.sixButton", "YES"])
+    }
+
+    @MainActor func testBookSNES() {
+        shoot("book-snes", args: ["-pose", "book", "-autoplay", "ares_snes_demo.sfc", "-freshStart", "YES"], landscape: true)
+    }
+
+    @MainActor func testPhoneGBA() {
+        shoot("iphone-gba", args: ["-pose", "flat", "-duoAspect", "NO", "-autoplay", "gba_demo.gba", "-freshStart", "YES"])
+    }
+
+    @MainActor func testAbout() {
+        shoot("iphone-about", args: ["-pose", "flat", "-duoAspect", "NO"], wait: 3) { app in
+            app.buttons["About and acknowledgements"].tap()
+            sleep(2)
+        }
+    }
+
     @MainActor func testLibraryTable() {
         shoot("table-library", args: ["-pose", "table"], wait: 3)
     }

@@ -128,7 +128,7 @@ enum ControllerLayout {
                 button(.b, "B", .ember, c.x, c.y + r, scale: 0.86),
             ]
         case .md:
-            let gap = d * 1.08
+            let gap = d * (sixButton ? 0.98 : 1.08)
             var list = [
                 button(.y, "A", .sand, c.x - gap, c.y + d * 0.28, scale: 0.84),
                 button(.b, "B", .ember, c.x, c.y + d * 0.06, scale: 0.84),
@@ -171,8 +171,10 @@ enum ControllerLayout {
         let midY = shoulderSpace + usableH * 0.50
         var c: [Control] = shoulders(system, width: w, top: 4)
         c.append(Control(kind: .dpad, frame: CGRect(x: w * 0.23 - dpad / 2, y: midY - dpad / 2, width: dpad, height: dpad)))
-        let cx = system == .snes || system == .md ? w * 0.78 : w * 0.77
-        c += faceCluster(system, centre: CGPoint(x: cx, y: midY), diameter: face, sixButton: sixButton)
+        let cx = system == .md ? w * 0.80 : (system == .snes ? w * 0.78 : w * 0.77)
+        // The six-button pad's top row needs room above the cluster: push it down a little.
+        let cy = system == .md && sixButton ? midY + face * 0.12 : midY
+        c += faceCluster(system, centre: CGPoint(x: cx, y: cy), diameter: face, sixButton: sixButton)
         let pillW = min(58, w * 0.13), pillH: CGFloat = 34
         let pillY = min(h - pillH - 22, midY + dpad * 0.5)
         let selectLabel = system == .md ? "MODE" : "SELECT"
