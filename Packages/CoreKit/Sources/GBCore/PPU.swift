@@ -31,6 +31,8 @@ final class PPU {
     var nextEvent = 80
     var statLine = false
     var windowLine = 0
+    /// The window line counter as it was when mode 3 began (the line is drawn again at its end).
+    var lineWindowStart = 0
     var wyHit = false
     var frameComplete = false
     var hblankStarted = false
@@ -181,9 +183,14 @@ final class PPU {
             }
             switch mode {
             case 2:
+                // Draw once now for the mode-3 length, then again when mode 3 ends, so register
+                // writes made by LYC / mode-2 handlers during the line still land on it.
                 mode = 3
+                lineWindowStart = windowLine
                 nextEvent = 80 + renderLine()
             case 3:
+                windowLine = lineWindowStart
+                _ = renderLine()
                 mode = 0
                 hblankStarted = true
                 nextEvent = 456
@@ -373,7 +380,7 @@ final class PPU {
         st.sync(&lcdc); st.sync(&statSel); st.sync(&scy); st.sync(&scx); st.sync(&ly); st.sync(&lyc)
         st.sync(&bgp); st.sync(&obp0); st.sync(&obp1); st.sync(&wy); st.sync(&wx)
         st.sync(&mode); st.sync(&dot); st.sync(&nextEvent); st.sync(&statLine)
-        st.sync(&windowLine); st.sync(&wyHit); st.sync(&hblankStarted)
+        st.sync(&windowLine); st.sync(&lineWindowStart); st.sync(&wyHit); st.sync(&hblankStarted)
         st.sync(&bcps); st.sync(&ocps)
         st.bytes(vram, count: 0x4000)
         st.bytes(oam, count: 0xA0)

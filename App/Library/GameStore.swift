@@ -253,6 +253,8 @@ final class GameStore {
             "demo.nes": "Test Cart: Hills", "cpu_selftest.nes": "Test Cart: CPU Check",
             "gb_demo.gbc": "Test Cart: Pocket Hills", "gb_demo_dmg.gb": "Test Cart: Pocket Hills (mono)",
             "gb_selftest.gb": "Test Cart: Pocket CPU Check", "gb_cgbtest.gbc": "Test Cart: Pocket Colour Check",
+            "mmc1_probe.nes": "Test Cart: MMC1 Probe", "uxrom_probe.nes": "Test Cart: UxROM Probe",
+            "cnrom_probe.nes": "Test Cart: CNROM Probe", "mmc3_probe.nes": "Test Cart: MMC3 Probe",
         ]
         for url in files.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
             guard let data = try? Data(contentsOf: url),
