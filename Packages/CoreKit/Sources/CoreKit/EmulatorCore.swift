@@ -5,6 +5,7 @@ public enum SystemID: String, Codable, Sendable, CaseIterable, Identifiable {
     case nes
     case gb
     case gbc
+    case gba
 
     public var id: String { rawValue }
 
@@ -14,6 +15,7 @@ public enum SystemID: String, Codable, Sendable, CaseIterable, Identifiable {
         case .nes: "NES"
         case .gb: "Game Boy"
         case .gbc: "Game Boy Color"
+        case .gba: "Game Boy Advance"
         }
     }
 
@@ -22,6 +24,7 @@ public enum SystemID: String, Codable, Sendable, CaseIterable, Identifiable {
         case .nes: ["nes"]
         case .gb: ["gb"]
         case .gbc: ["gbc"]
+        case .gba: ["gba"]
         }
     }
 
@@ -115,6 +118,16 @@ public enum CoreFactory {
            rom[rom.startIndex + 2] == 0x53, rom[rom.startIndex + 3] == 0x1A {
             return .nes
         }
+        if rom.count >= 0xC0 {
+            // Game Boy Advance header: a branch at 0 (byte 3 = $EA), the fixed $96 at $B2 and a
+            // valid complement check at $BD. Checked before the GB header, which a GBA ROM can pass by chance.
+            let b = rom.startIndex
+            if rom[b + 3] == 0xEA, rom[b + 0xB2] == 0x96 {
+                var chk: UInt8 = 0
+                for i in 0xA0...0xBC { chk = chk &- rom[b + i] }
+                if chk &- 0x19 == rom[b + 0xBD] { return .gba }
+            }
+        }
         if rom.count >= 0x150 {
             // Game Boy cartridge header: check the header checksum at $14D.
             var sum: UInt8 = 0
@@ -128,6 +141,7 @@ public enum CoreFactory {
         case "nes": return .nes
         case "gb": return .gb
         case "gbc": return .gbc
+        case "gba": return .gba
         default: return nil
         }
     }

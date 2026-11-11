@@ -146,6 +146,17 @@ import Testing
                     if tail.allSatisfy({ $0 == 0x42 }) { return ("FAIL", false) }
                 }
             case .serialText:
+                // Some blargg GB ROMs report through cartridge RAM instead (like the NES $6000 protocol).
+                if gb.debugPeek(0xA001) == 0xDE && gb.debugPeek(0xA002) == 0xB0 && gb.debugPeek(0xA003) == 0x61 {
+                    let st = gb.debugPeek(0xA000)
+                    if st < 0x80 {
+                        var t = ""
+                        var a: UInt16 = 0xA004
+                        while a < 0xC000 { let c = gb.debugPeek(a); if c == 0 { break }; t.append(Character(UnicodeScalar(c))); a += 1 }
+                        let summary = t.replacingOccurrences(of: "\n", with: " / ")
+                        return (st == 0 ? "PASS" : "FAIL \(st): \(summary.prefix(140))", st == 0)
+                    }
+                }
                 let text = String(decoding: log, as: UTF8.self)
                 if text.contains("Passed") { return ("PASS", true) }
                 if text.contains("Failed") {
@@ -206,7 +217,7 @@ import Testing
         }
         if want("AccuracyCoin") { rows += Self.runAccuracyCoin() }
 
-        if want("gb") {
+        if want("gb") || want("mooneye") || want("blargg") {
             let blargg = Self.files("gb-collection/blargg", ext: ["gb", "gbc"])
             for u in blargg {
                 let r = Self.runGB(u, verdict: .serialText, maxFrames: 4000)

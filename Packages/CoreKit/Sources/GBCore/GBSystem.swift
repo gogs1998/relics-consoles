@@ -69,6 +69,10 @@ public final class GBSystem: EmulatorCore {
     var dmaSource: UInt16 = 0
     var dmaIndex = 0
     var dmaReg: UInt8 = 0xFF
+    /// M-cycles until a newly written DMA starts copying (a running one keeps going meanwhile).
+    var dmaStartDelay = 0
+    var dmaLastByte: UInt8 = 0xFF
+    var dmaPendingSource: UInt16 = 0
 
     // CGB HDMA
     var hdmaSrc: UInt16 = 0
@@ -121,7 +125,7 @@ public final class GBSystem: EmulatorCore {
         doubleSpeed = false; speedPrepare = false
         p1Select = 0x30; sb = 0; sc = 0x7E
         svbk = 1; wramOff = 0x1000
-        dmaActive = false; dmaSource = 0; dmaIndex = 0; dmaReg = 0xFF
+        dmaActive = false; dmaSource = 0; dmaIndex = 0; dmaReg = 0xFF; dmaStartDelay = 0
         hdmaSrc = 0; hdmaDst = 0; hdmaLen = 0x7F; hdmaActive = false; hdmaBlockPending = false
         ppu.lcdc = 0x91
         ppu.statSel = 0
@@ -222,6 +226,7 @@ public final class GBSystem: EmulatorCore {
         st.sync(&padState); st.sync(&p1Select); st.sync(&sb); st.sync(&sc)
         st.sync(&svbk); st.sync(&wramOff)
         st.sync(&dmaActive); st.sync(&dmaSource); st.sync(&dmaIndex); st.sync(&dmaReg)
+        st.sync(&dmaStartDelay); st.sync(&dmaPendingSource); st.sync(&dmaLastByte)
         st.sync(&hdmaSrc); st.sync(&hdmaDst); st.sync(&hdmaLen); st.sync(&hdmaActive); st.sync(&hdmaBlockPending)
         st.bytes(wram, count: 0x8000)
         st.bytes(hram, count: 0x7F)
@@ -263,9 +268,18 @@ public final class GBSystem: EmulatorCore {
         apu.step(dotsPerM)
         // OAM DMA: one byte per M-cycle
         if dmaActive {
-            ppu.oam[dmaIndex] = busRead(dmaSource &+ UInt16(dmaIndex))
+            dmaLastByte = busRead(dmaSource &+ UInt16(dmaIndex))
+            ppu.oam[dmaIndex] = dmaLastByte
             dmaIndex += 1
             if dmaIndex >= 0xA0 { dmaActive = false }
+        }
+        if dmaStartDelay > 0 {
+            dmaStartDelay -= 1
+            if dmaStartDelay == 0 {
+                dmaSource = dmaPendingSource
+                dmaIndex = 0
+                dmaActive = true
+            }
         }
     }
 
@@ -288,6 +302,15 @@ public final class GBSystem: EmulatorCore {
     @inline(__always)
     private func read(_ addr: UInt16) -> UInt8 {
         tick()
+        // While OAM DMA owns the bus, the CPU only reaches I/O and high RAM.
+        if dmaActive && addr < 0xFF00 {
+            if addr >= 0xFE00 { return 0xFF }
+            // Same bus as the DMA source: the CPU sees the byte being copied; other bus: normal.
+            let cpuVideo = addr >= 0x8000 && addr < 0xA000
+            let dmaVideo = dmaSource >= 0x8000 && dmaSource < 0xA000
+            if cpuVideo == dmaVideo { return dmaLastByte }
+            return busRead(addr)
+        }
         return busRead(addr)
     }
 
@@ -413,9 +436,8 @@ public final class GBSystem: EmulatorCore {
             dmaReg = v
             var src = UInt16(v) << 8
             if src >= 0xE000 { src &-= 0x2000 }
-            dmaSource = src
-            dmaIndex = 0
-            dmaActive = true
+            dmaPendingSource = src
+            dmaStartDelay = 2
         case 0xFF47: ppu.bgp = v
         case 0xFF48: ppu.obp0 = v
         case 0xFF49: ppu.obp1 = v

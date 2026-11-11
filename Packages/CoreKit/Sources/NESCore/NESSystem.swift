@@ -398,8 +398,10 @@ public final class NESSystem: EmulatorCore {
         var vec = vector
         if vector == 0xFFFA {
             needNMI = false
+            prevNeedNMI = false
         } else if needNMI {
             needNMI = false
+            prevNeedNMI = false
             vec = 0xFFFA
         }
         push(packFlags(brk: brk))
@@ -414,6 +416,8 @@ public final class NESSystem: EmulatorCore {
         if jammed { tick(); return }
         let op = fetch()
         execute(op)
+        // BRK is itself an interrupt sequence: the handler's first instruction always runs.
+        if op == 0x00 { return }
         if prevNeedNMI {
             _ = read(pc); _ = read(pc)
             interrupt(vector: 0xFFFA, brk: false)
