@@ -276,7 +276,8 @@ final class APU {
     var dmc = DMC()
 
     var frameMode5 = false
-    var frameIRQInhibit = true
+    var frameIRQInhibit = false   // power-on behaves as if $4017 = $00
+    var last4017: UInt8 = 0
     var frameIRQ = false
     var frameCycle = 0
     var evenCycle = false
@@ -306,6 +307,11 @@ final class APU {
         frameCycle = 0
         frameIRQ = false
         dmc.irq = false
+        writeRegister(0x4017, last4017)   // reset re-writes the last value (power-on: $00)
+        // ...and the write lands during the reset sequence, about 10 cycles before the first
+        // instruction runs.
+        pendingFrameReset = -1
+        frameCycle = 6
     }
 
     func readStatus() -> UInt8 {
@@ -353,6 +359,7 @@ final class APU {
                 dmc.bytesRemaining = 0
             }
         case 0x4017:
+            last4017 = v
             frameMode5 = (v & 0x80) != 0
             frameIRQInhibit = (v & 0x40) != 0
             if frameIRQInhibit { frameIRQ = false }
@@ -391,16 +398,21 @@ final class APU {
         case 7457: quarterFrame()
         case 14913: quarterFrame(); halfFrame()
         case 22371: quarterFrame()
-        case 29829:
+        case 29828:
             if !frameMode5 && !frameIRQInhibit { frameIRQ = true }
-        case 29830:
+        case 29829:
             if !frameMode5 {
                 quarterFrame(); halfFrame()
                 if !frameIRQInhibit { frameIRQ = true }
+            }
+        case 29830:
+            if !frameMode5 {
+                if !frameIRQInhibit { frameIRQ = true }
                 frameCycle = 0
             }
+        case 37281:
+            if frameMode5 { quarterFrame(); halfFrame() }
         case 37282:
-            quarterFrame(); halfFrame()
             frameCycle = 0
         default:
             break
@@ -467,6 +479,6 @@ final class APU {
         s.section("APU ")
         pulse1.sync(&s); pulse2.sync(&s); triangle.sync(&s); noise.sync(&s); dmc.sync(&s)
         s.sync(&frameMode5); s.sync(&frameIRQInhibit); s.sync(&frameIRQ); s.sync(&frameCycle)
-        s.sync(&evenCycle); s.sync(&pendingFrameReset); s.sync(&cpuStall)
+        s.sync(&evenCycle); s.sync(&pendingFrameReset); s.sync(&cpuStall); s.sync(&last4017)
     }
 }

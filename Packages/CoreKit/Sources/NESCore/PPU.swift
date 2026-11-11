@@ -35,6 +35,22 @@ final class PPU {
     var oddFrame = false
     var frameComplete = false
     var nmiLine = false
+    var suppressVBlank = false
+    /// A rising NMI edge waiting for the CPU, and the delay before a VBlank-caused rise counts.
+    var nmiEdge = false
+    // MMC3-style scanline counting watches PPU address line A12.
+    var trackA12 = false
+    var a12High = false
+    var a12LowSince: UInt64 = 0
+    var dotClock: UInt64 = 0
+    let spA12: UnsafeMutablePointer<Bool> = {
+        let p = UnsafeMutablePointer<Bool>.allocate(capacity: 8)
+        p.initialize(repeating: false, count: 8)
+        return p
+    }()
+    var nmiRiseCountdown = 0
+    /// Set by a $2002 read that races the VBlank flag; the CPU drops a just-detected NMI.
+    var cancelNMI = false
 
     // background pipeline
     var bgLo: UInt16 = 0, bgHi: UInt16 = 0
@@ -71,7 +87,7 @@ final class PPU {
     deinit {
         oam.deallocate(); ciram.deallocate(); palette.deallocate()
         spPatLo.deallocate(); spPatHi.deallocate(); spX.deallocate(); spAttr.deallocate()
-        pixels.deallocate(); colours.deallocate()
+        pixels.deallocate(); colours.deallocate(); spA12.deallocate()
     }
 
     func reset() {
@@ -121,15 +137,32 @@ final class PPU {
         else { palette[paletteIndex(a)] = value & 0x3F }
     }
 
+    /// Address line A12 changed (fetch or CPU access). A rise after it has been low for a few CPU
+    /// cycles clocks the cartridge's counter.
+    @inline(__always)
+    func setA12(_ high: Bool) {
+        if high == a12High { return }
+        a12High = high
+        if high {
+            if dotClock &- a12LowSince >= 9 { mapper.scanline() }
+        } else {
+            a12LowSince = dotClock
+        }
+    }
+
     // MARK: CPU-facing registers
 
     func readRegister(_ addr: UInt16) -> UInt8 {
         switch addr & 7 {
         case 2:
+            // The VBlank race: a read one dot before the flag sets sees it clear and stops it
+            // (and the NMI) for this frame; a read on the dot it sets sees it but cancels the NMI.
+            if scanline == 241 && dot == 1 { suppressVBlank = true }
+            if scanline == 241 && (dot == 2 || dot == 3) { cancelNMI = true }
             let r = (status & 0xE0) | (openBus & 0x1F)
             status &= 0x7F
             w = false
-            updateNMI()
+            updateNMI(fromStatusRead: true)
             openBus = r
             return r
         case 4:
@@ -180,6 +213,7 @@ final class PPU {
             } else {
                 t = (t & 0xFF00) | UInt16(value)
                 v = t
+                if trackA12 { setA12((v & 0x1000) != 0) }
             }
             w.toggle()
         case 7:
@@ -193,11 +227,22 @@ final class PPU {
     @inline(__always)
     private func incrementV() {
         v = (v &+ ((ctrl & 0x04) != 0 ? 32 : 1)) & 0x7FFF
+        if trackA12 && !(renderingEnabled && (scanline < 240 || scanline == 261)) { setA12((v & 0x1000) != 0) }
     }
 
     @inline(__always)
-    func updateNMI() {
-        nmiLine = (status & 0x80) != 0 && (ctrl & 0x80) != 0
+    /// Recomputes the NMI output. A rise caused by a register write is latched at once; a rise
+    /// caused by VBlank starting is latched two dots later, so disabling NMI right after the
+    /// flag sets still suppresses it.
+    func updateNMI(fromVBlank: Bool = false, fromStatusRead: Bool = false) {
+        let line = (status & 0x80) != 0 && (ctrl & 0x80) != 0
+        if line && !nmiLine {
+            nmiRiseCountdown = 2
+        }
+        // Disabling NMI cancels a rise not yet latched; a $2002 read only does inside the race
+        // window (handled by `cancelNMI`).
+        if !line && !fromStatusRead { nmiRiseCountdown = 0 }
+        nmiLine = line
     }
 
     // MARK: scrolling helpers
@@ -241,6 +286,13 @@ final class PPU {
 
     @inline(__always)
     private func backgroundFetch() {
+        if trackA12 {
+            switch dot & 7 {
+            case 1, 3: setA12(false)
+            case 4: setA12((ctrl & 0x10) != 0)
+            default: break
+            }
+        }
         switch dot & 7 {
         case 1:
             reloadShifters()
@@ -266,6 +318,10 @@ final class PPU {
 
     @inline(__always)
     func step() {
+        if nmiRiseCountdown > 0 {
+            nmiRiseCountdown -= 1
+            if nmiRiseCountdown == 0 { nmiEdge = true }
+        }
         let visible = scanline < 240
         let preRender = scanline == 261
         if renderingEnabled && (visible || preRender) {
@@ -281,9 +337,20 @@ final class PPU {
             if dot == 256 { incrementY() }
             if dot == 257 {
                 v = (v & ~0x041F) | (t & 0x041F)
-                if visible { evaluateSprites() } else { spriteCount = 0 }
+                if visible { evaluateSprites() } else {
+                    spriteCount = 0
+                    let emptyA12 = (ctrl & 0x20) != 0 ? true : (ctrl & 0x08) != 0
+                    for i in 0..<8 { spA12[i] = emptyA12 }
+                }
             }
-            if dot == 260 { mapper.scanline() }
+            if trackA12 && dot >= 257 && dot <= 320 {
+                switch (dot - 257) & 7 {
+                case 0: setA12(false)                     // garbage nametable fetch
+                case 3: setA12(spA12[(dot - 257) >> 3])   // sprite pattern fetch
+                default: break
+                }
+            }
+            if trackA12 && (dot == 337 || dot == 339) { setA12(false) }
             if preRender && dot >= 280 && dot <= 304 {
                 v = (v & ~0x7BE0) | (t & 0x7BE0)
             }
@@ -298,8 +365,9 @@ final class PPU {
         }
 
         if scanline == 241 && dot == 1 {
-            status |= 0x80
-            updateNMI()
+            if !suppressVBlank { status |= 0x80 }
+            suppressVBlank = false
+            updateNMI(fromVBlank: true)
             frameComplete = true
         } else if preRender && dot == 1 {
             status &= 0x1F
@@ -307,6 +375,7 @@ final class PPU {
         }
 
         dot += 1
+        dotClock &+= 1
         if dot > 340 {
             dot = 0
             scanline += 1
@@ -366,6 +435,9 @@ final class PPU {
     /// Finds up to eight sprites on the *next* line and fetches their pattern rows.
     private func evaluateSprites() {
         let height = (ctrl & 0x20) != 0 ? 16 : 8
+        // Empty slots still fetch tile $FF: from the sprite table (8x8) or $1000 (8x16).
+        let emptyA12 = height == 16 ? true : (ctrl & 0x08) != 0
+        for i in 0..<8 { spA12[i] = emptyA12 }
         spriteCount = 0
         spriteZeroOnLine = false
         let line = scanline
@@ -400,6 +472,7 @@ final class PPU {
                 spPatHi[spriteCount] = hi
                 spX[spriteCount] = xPos
                 spAttr[spriteCount] = attr
+                spA12[spriteCount] = (addr & 0x1000) != 0
                 if n == 0 { spriteZeroOnLine = true }
                 spriteCount += 1
             }
@@ -414,7 +487,8 @@ final class PPU {
         s.bytes(oam, count: 256)
         s.bytes(ciram, count: 0x1000)
         s.bytes(palette, count: 32)
-        s.sync(&scanline); s.sync(&dot); s.sync(&oddFrame); s.sync(&nmiLine)
+        s.sync(&scanline); s.sync(&dot); s.sync(&oddFrame); s.sync(&nmiLine); s.sync(&suppressVBlank); s.sync(&nmiEdge); s.sync(&nmiRiseCountdown)
+        s.sync(&a12High); s.sync(&a12LowSince); s.sync(&dotClock)
         s.sync(&bgLo); s.sync(&bgHi); s.sync(&atLo); s.sync(&atHi)
         s.sync(&ntLatch); s.sync(&atLatch); s.sync(&patLo); s.sync(&patHi)
         s.sync(&spriteCount); s.sync(&spriteZeroOnLine)

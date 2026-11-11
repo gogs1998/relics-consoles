@@ -23,13 +23,18 @@ public final class NESSystem: EmulatorCore {
     var a: UInt8 = 0
     var x: UInt8 = 0
     var y: UInt8 = 0
-    var s: UInt8 = 0xFD
+    var s: UInt8 = 0x00   // power-on reset's three phantom pushes leave it at $FD
     var pc: UInt16 = 0
     var fC = false, fZ = false, fI = true, fD = false, fV = false, fN = false
 
     var cycles: UInt64 = 0
-    var nmiPending = false
+    // Interrupt polling, sampled at the end of every cycle; an instruction acts on the values
+    // from its second-to-last cycle (the "prev" ones).
+    var needNMI = false
+    var prevNeedNMI = false
     var prevNMILine = false
+    var runIRQ = false
+    var prevRunIRQ = false
     var jammed = false
 
     // controllers
@@ -51,7 +56,12 @@ public final class NESSystem: EmulatorCore {
         }
         ppu.cart = cart
         ppu.mapper = mapper
-        apu.dmcRead = { [unowned self] addr in self.peek(addr) }
+        ppu.trackA12 = mapper is MMC3
+        apu.dmcRead = { [unowned self] addr in
+            let v = self.peek(addr)
+            self.openBus = v      // a DMA read drives the data bus like any other
+            return v
+        }
         reset()
     }
 
@@ -128,7 +138,8 @@ public final class NESSystem: EmulatorCore {
         st.section("CPU ")
         st.sync(&a); st.sync(&x); st.sync(&y); st.sync(&s); st.sync(&pc)
         st.sync(&fC); st.sync(&fZ); st.sync(&fI); st.sync(&fD); st.sync(&fV); st.sync(&fN)
-        st.sync(&cycles); st.sync(&nmiPending); st.sync(&prevNMILine); st.sync(&jammed)
+        st.sync(&cycles); st.sync(&needNMI); st.sync(&prevNeedNMI); st.sync(&prevNMILine); st.sync(&runIRQ)
+        st.sync(&prevRunIRQ); st.sync(&jammed)
         st.sync(&padShift); st.sync(&padStrobe); st.sync(&openBus)
         st.bytes(ram, count: 0x800)
         cart.sync(&st)
@@ -143,10 +154,13 @@ public final class NESSystem: EmulatorCore {
     @inline(__always)
     private func tick() {
         ppu.step(); ppu.step(); ppu.step()
-        if ppu.nmiLine && !prevNMILine { nmiPending = true }
-        prevNMILine = ppu.nmiLine
         apu.step()
         cycles &+= 1
+        prevNeedNMI = needNMI
+        if ppu.nmiEdge { needNMI = true; ppu.nmiEdge = false }
+        prevNMILine = ppu.nmiLine
+        prevRunIRQ = runIRQ
+        runIRQ = (apu.irqLine || mapper.irqAsserted) && !fI
     }
 
     @inline(__always)
@@ -183,7 +197,11 @@ public final class NESSystem: EmulatorCore {
     private func busRead(_ addr: UInt16) -> UInt8 {
         if addr < 0x2000 { return ram[Int(addr & 0x7FF)] }
         if addr >= 0x8000 { return cart.readPRG(addr) }
-        if addr < 0x4000 { return ppu.readRegister(addr) }
+        if addr < 0x4000 {
+            let v = ppu.readRegister(addr)
+            if ppu.cancelNMI { ppu.cancelNMI = false; needNMI = false; ppu.nmiEdge = false; ppu.nmiRiseCountdown = 0 }
+            return v
+        }
         if addr >= 0x6000 { return cart.prgRAMEnabled ? cart.prgRAM[Int(addr & 0x1FFF)] : openBus }
         switch addr {
         case 0x4015:
@@ -362,6 +380,9 @@ public final class NESSystem: EmulatorCore {
     private func branch(_ taken: Bool) {
         let offset = Int8(bitPattern: fetch())
         guard taken else { return }
+        // A taken branch ignores an IRQ that only appears during its last cycles, so the next
+        // instruction runs first.
+        if runIRQ && !prevRunIRQ { runIRQ = false }
         _ = read(pc)
         let target = UInt16(bitPattern: Int16(bitPattern: pc) &+ Int16(offset))
         if (target & 0xFF00) != (pc & 0xFF00) {
@@ -373,14 +394,16 @@ public final class NESSystem: EmulatorCore {
     private func interrupt(vector: UInt16, brk: Bool) {
         push(UInt8(pc >> 8))
         push(UInt8(pc & 0xFF))
-        push(packFlags(brk: brk))
-        fI = true
         // An NMI arriving during an IRQ/BRK sequence hijacks the vector.
         var vec = vector
-        if vector != 0xFFFA && nmiPending {
-            nmiPending = false
+        if vector == 0xFFFA {
+            needNMI = false
+        } else if needNMI {
+            needNMI = false
             vec = 0xFFFA
         }
+        push(packFlags(brk: brk))
+        fI = true
         let lo = UInt16(read(vec))
         pc = lo | (UInt16(read(vec + 1)) << 8)
     }
@@ -389,16 +412,12 @@ public final class NESSystem: EmulatorCore {
 
     func stepInstruction() {
         if jammed { tick(); return }
-        let iBefore = fI
         let op = fetch()
         execute(op)
-        // Interrupt polling. CLI, SEI and PLP change I one instruction "late".
-        let iForPoll = (op == 0x58 || op == 0x78 || op == 0x28) ? iBefore : fI
-        if nmiPending {
-            nmiPending = false
+        if prevNeedNMI {
             _ = read(pc); _ = read(pc)
             interrupt(vector: 0xFFFA, brk: false)
-        } else if !iForPoll && (apu.irqLine || mapper.irqAsserted) {
+        } else if prevRunIRQ {
             _ = read(pc); _ = read(pc)
             interrupt(vector: 0xFFFE, brk: false)
         }
@@ -679,9 +698,9 @@ public final class NESSystem: EmulatorCore {
         case 0x8B:                                                             // ANE (magic $EE)
             let v = fetch()
             a = (a | 0xEE) & x & v; setZN(a)
-        case 0xAB:                                                             // LXA (magic $EE)
+        case 0xAB:                                                             // LXA (magic $FF)
             let v = fetch()
-            a = (a | 0xEE) & v; x = a; setZN(a)
+            a = v; x = a; setZN(a)
         default:
             // KIL: freeze, as hardware does.
             jammed = true

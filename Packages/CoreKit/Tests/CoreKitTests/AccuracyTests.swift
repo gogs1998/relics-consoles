@@ -11,7 +11,7 @@ import Testing
 ///
 ///     ACCURACY_DIR=$PWD/../../TestSuites ACCURACY_OUT=/tmp/acc.md swift test -c release --filter Accuracy
 @Suite(.serialized) struct AccuracyTests {
-    static let dir = ProcessInfo.processInfo.environment["ACCURACY_DIR"].map { URL(fileURLWithPath: $0) }
+    static let dir = ProcessInfo.processInfo.environment["ACCURACY_DIR"].map { URL(fileURLWithPath: $0).standardizedFileURL.resolvingSymlinksInPath() }
     static let out = ProcessInfo.processInfo.environment["ACCURACY_OUT"]
     static let only = ProcessInfo.processInfo.environment["ACCURACY_ONLY"]
 
@@ -26,7 +26,8 @@ import Testing
     }
 
     static func rel(_ u: URL, _ sub: String) -> String {
-        u.path.replacingOccurrences(of: dir!.appendingPathComponent(sub).path + "/", with: "")
+        let base = dir!.appendingPathComponent(sub).resolvingSymlinksInPath().path + "/"
+        return u.resolvingSymlinksInPath().path.replacingOccurrences(of: base, with: "")
     }
 
     // MARK: NES
@@ -197,7 +198,8 @@ import Testing
         if want("nestest") { let r = Self.runNestest(); rows.append(Row(suite: "nestest", test: "nestest.nes (automation)", result: r.0, pass: r.1)) }
 
         if want("nes") {
-            for u in Self.files("nes-test-roms", ext: ["nes"]) {
+            let filter = ProcessInfo.processInfo.environment["ACCURACY_FILTER"]
+            for u in Self.files("nes-test-roms", ext: ["nes"]) where filter == nil || u.path.contains(filter!) {
                 let r = Self.runBlargg(u)
                 rows.append(Row(suite: "nes-test-roms", test: Self.rel(u, "nes-test-roms"), result: r.0, pass: r.1))
             }
