@@ -3,7 +3,7 @@
 *.xcworkspace
 xcuserdata/
 DerivedData/
-build/
+/build/
 .build/
 .swiftpm/
 Local.xcconfig
