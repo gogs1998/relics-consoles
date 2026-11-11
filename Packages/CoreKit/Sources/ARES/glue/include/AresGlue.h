@@ -59,6 +59,16 @@ void ares_reset(AresHandle* h);
 /// Runs one video frame with `buttons` (ARES_BTN_* / ARES_SNES_* / ARES_MD_* bits) held.
 void ares_run_frame(AresHandle* h, uint32_t buttons);
 
+/// Sets the buttons held on controller `port` (0 = port 1, 1 = port 2; others ignored).
+/// Both ports have a pad connected: SNES gamepads, Mega Drive 6-button pads.
+/// `ares_run_frame` overwrites port 1 only; port 2 keeps the last value set here.
+void ares_set_input(AresHandle* h, uint32_t port, uint32_t buttons);
+/// Runs one video frame with the buttons set by `ares_set_input`.
+void ares_run_frame_ports(AresHandle* h);
+/// Debug/tests: how many button reads the core made from `port` during the last frame, and in
+/// `*seen` (if non-NULL) the pressed button bits it read. 0 reads = the game didn't poll that port.
+uint32_t ares_debug_port_reads(const AresHandle* h, uint32_t port, uint32_t* seen);
+
 /// The last frame as little-endian 0xAARRGGBB words (BGRA8 in memory), `*width` x `*height`.
 /// SNES: 256x224 (512 wide in hi-res modes, 239/478 lines with overscan/interlace).
 /// Mega Drive: 320 or 256 wide x 224 (240 on PAL in V30, doubled when interlaced).

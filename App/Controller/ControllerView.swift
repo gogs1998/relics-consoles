@@ -5,21 +5,32 @@ import SwiftUI
 struct ControllerView: View {
     var controls: [Control]
     let model: ControllerModel
+    var settings = ControlSettings()
     /// Translucent controls over a game (landscape).
     var floating = false
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            ForEach(controls) { control in
-                controlView(control)
+            ForEach(controls.filter { !$0.isHidden }) { control in
+                ControlArt(control: control, model: model)
                     .frame(width: control.frame.width, height: control.frame.height)
+                    .opacity(control.opacity)
                     .position(x: control.frame.midX, y: control.frame.midY)
             }
-            TouchSurface(controls: controls, model: model)
+            TouchSurface(controls: controls.filter { !$0.isHidden }, model: model)
                 .accessibilityHidden(true)
         }
         .opacity(floating ? 0.62 : 1)
+        .onChange(of: controls, initial: true) { _, new in model.apply(controls: new, settings: settings) }
+        .onChange(of: settings) { _, new in model.apply(controls: controls, settings: new) }
     }
+}
+
+/// The drawing for one control (shared by the controller and the layout editor).
+struct ControlArt: View {
+    let control: Control
+    let model: ControllerModel
+    var body: some View { controlView(control) }
 
     @ViewBuilder
     private func controlView(_ c: Control) -> some View {
@@ -32,6 +43,8 @@ struct ControllerView: View {
             PillKeyView(label: label, pressed: model.pressed.contains(s))
         case .shoulder(let s, let label):
             ShoulderView(label: label, pressed: model.pressed.contains(s))
+        case .combo(let s, let label):
+            ComboView(label: label, pressed: model.pressed.isSuperset(of: s))
         case .menu:
             RoundKeyView(symbol: "ellipsis", label: "Menu", pressed: model.menuDown)
         case .fastForward:
@@ -273,6 +286,26 @@ struct RoundKeyView: View {
         .animation(.easeOut(duration: 0.08), value: pressed)
         .accessibilityElement()
         .accessibilityLabel(label)
+    }
+}
+
+/// A combo zone: a small recessed lozenge that presses several buttons together.
+struct ComboView: View {
+    var label: String
+    var pressed: Bool
+
+    var body: some View {
+        ZStack {
+            Capsule()
+                .fill(Color.black.opacity(0.45))
+                .overlay(Capsule().stroke(Color.white.opacity(pressed ? 0.35 : 0.12), lineWidth: 1))
+            Text(label == "AB" ? "+" : label)
+                .font(.rounded(.caption2, weight: .heavy))
+                .foregroundStyle(pressed ? Theme.ember : Theme.inkDim)
+                .minimumScaleFactor(0.5)
+        }
+        .accessibilityElement()
+        .accessibilityLabel(label == "AB" ? "A and B together" : "Whole row together")
     }
 }
 

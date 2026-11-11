@@ -11,12 +11,28 @@ final class PlayerModel {
     let game: GameRecord
     let session: EmulatorSession
     let controller = ControllerModel()
-    let physical = PhysicalInput()
+    let gamepads: GamepadHub
+    let layouts = LayoutStore.shared
+    /// Edit mode for the touch controller (nil when not editing). The game stays paused meanwhile.
+    var editor: LayoutEditor?
+    /// The controller-remapping sheet.
+    var showingControllers = false
+    /// Keep the on-screen controller visible even with a physical controller connected.
+    var keepTouchControls = UserDefaults.standard.bool(forKey: "keepTouchControls") {
+        didSet { UserDefaults.standard.set(keepTouchControls, forKey: "keepTouchControls") }
+    }
+    private(set) var players = 1
+    /// True when a physical controller drives the game and the touch controller steps aside.
+    var physicalMode: Bool { gamepads.isConnected && !keepTouchControls && editor == nil }
 
     private(set) var videoSize = CGSize(width: 256, height: 240)
     private(set) var errorMessage: String?
     private(set) var started = false
-    var menuOpen = false { didSet { menuOpen ? pause() : resume() } }
+    var menuOpen = false {
+        didSet {
+            if menuOpen { pause() } else if editor == nil && !showingControllers { resume() }
+        }
+    }
     private(set) var fastForward = false
     private(set) var rewinding = false
     private(set) var toast: String?
@@ -49,6 +65,7 @@ final class PlayerModel {
         self.store = store
         let rom = try Data(contentsOf: store.romURL(for: game))
         if rom.isEmpty { throw ImportError.unreadable(game.fileName) }
+        gamepads = GamepadHub(system: game.system)
         let battery = try? Data(contentsOf: store.batteryURL(for: game))
         lastBattery = battery
         session = EmulatorSession(system: game.system, rom: rom, battery: battery)
@@ -62,19 +79,24 @@ final class PlayerModel {
         controller.onMenu = { [weak self] in self?.menuOpen = true }
         controller.onFastForward = { [weak self] on in self?.setFastForward(on) }
         controller.onRewind = { [weak self] on in self?.setRewind(on) }
-        physical.attach(to: session.input)
-        physical.onFastForward = { [weak self] on in self?.setFastForward(on) }
-        physical.onRewind = { [weak self] on in self?.setRewind(on) }
-        physical.onMenu = { [weak self] in self?.menuOpen.toggle() }
+        gamepads.attach(to: session.input)
+        gamepads.onHotkey = { [weak self] key, down in self?.hotkey(key, down: down) }
+        gamepads.onConnection = { [weak self] name, connected in
+            guard let self else { return }
+            self.controller.releaseAll()
+            self.show(connected ? "\(name) connected" : "\(name) disconnected")
+        }
 
         session.onError = { [weak self] message in
             Task { @MainActor in self?.errorMessage = message }
         }
-        session.onStarted = { [weak self] w, h, crc, version in
+        session.onStarted = { [weak self] w, h, crc, version, players in
             Task { @MainActor in
                 self?.videoSize = CGSize(width: w, height: h)
                 self?.romCRC = crc
                 self?.stateVersion = version
+                self?.players = players
+                self?.gamepads.players = players
                 self?.started = true
                 if autoResume { self?.resumeAutoState() }
             }
@@ -138,7 +160,7 @@ final class PlayerModel {
         observers.forEach(NotificationCenter.default.removeObserver)
         observers.removeAll()
         controller.releaseAll()
-        physical.detach()
+        gamepads.detach()
         session.send(.stop)
         audio.stop()
         store.markPlayed(game.id, seconds: Date().timeIntervalSince(startTime))
@@ -237,6 +259,37 @@ final class PlayerModel {
     private func resumeAutoState() {
         guard FileManager.default.fileExists(atPath: store.stateURL(for: game, slot: 0).path) else { return }
         loadState(slot: 0)
+    }
+
+    // MARK: controllers and layouts
+
+    private func hotkey(_ key: Hotkey, down: Bool) {
+        switch key {
+        case .menu: if down { menuOpen.toggle() }
+        case .fastForward: setFastForward(down)
+        case .rewind: setRewind(down)
+        case .saveState:
+            if down { saveState(slot: 1); gamepads.pulse() }
+        case .loadState:
+            if down { loadState(slot: 1); gamepads.pulse(intensity: 0.45) }
+        }
+    }
+
+    func beginEditingControls() {
+        controller.releaseAll()
+        editor = LayoutEditor(system: game.system, gameID: game.id, store: layouts)
+        menuOpen = false          // stays paused while editing
+    }
+
+    func endEditingControls() {
+        editor = nil
+        resume()
+    }
+
+    func closeControllers() {
+        gamepads.saveMappings()
+        showingControllers = false
+        resume()
     }
 
     func startOver() {

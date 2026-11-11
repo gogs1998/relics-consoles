@@ -42,6 +42,16 @@ struct PlayerView: View {
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
         .onChange(of: arrangement) { _, _ in model.controller.releaseAll() }
+        .onChange(of: model.physicalMode) { _, physical in
+            // The touch layout's auto-fire buttons don't carry over to a physical controller.
+            if physical {
+                model.controller.releaseAll()
+                model.session.input.autoFire.store(0, ordering: .relaxed)
+            }
+        }
+        .sheet(isPresented: Binding(get: { model.showingControllers }, set: { if !$0 { model.closeControllers() } })) {
+            ControllersSheet(model: model)
+        }
         #if DEBUG
         .overlay(alignment: .topLeading) {
             Text("audio \(model.audioStats)")
@@ -72,57 +82,107 @@ struct PlayerView: View {
         return ZStack(alignment: .topLeading) {
             screen(in: bezel)
             HingeSeam(axis: .horizontal).place(stage.fold.frame)
-            deckBody(in: deck)
+            if model.physicalMode {
+                // With a controller in hand, the bottom screen becomes a companion: states,
+                // rewind / fast-forward, the menu and who's playing. (Spreading the game across
+                // both halves would put the hinge through the picture.)
+                ControllerCompanion(model: model, onQuit: onQuit).place(deck)
+            } else {
+                deckBody(in: deck, area: .table)
+            }
             if model.menuOpen { menuPanel.place(bottom.insetBy(dx: 10, dy: 8)) }
+            if model.editor != nil { editorPanel.place(top.insetBy(dx: 10, dy: 8)) }
         }
     }
 
     private var bookLayout: some View {
         let left = stage.farHalf
         let right = stage.nearHalf
+        if model.physicalMode {
+            // A controller: the game takes the whole left page; the right page is the companion.
+            return AnyView(ZStack(alignment: .topLeading) {
+                screen(in: left.insetBy(dx: 12, dy: 12))
+                HingeSeam(axis: .vertical).place(stage.fold.frame)
+                ControllerCompanion(model: model, onQuit: onQuit).place(right.insetBy(dx: 12, dy: 12))
+                if model.menuOpen { menuPanel.place(right.insetBy(dx: 10, dy: 10)) }
+            })
+        }
         let leftScreen = CGRect(x: left.minX + 12, y: left.minY + 12, width: left.width - 24, height: left.height * 0.6 - 12)
         let leftPad = CGRect(x: left.minX, y: leftScreen.maxY + 4, width: left.width, height: left.maxY - leftScreen.maxY - 8)
         let rightTop = CGRect(x: right.minX + 12, y: right.minY + 12, width: right.width - 24, height: right.height * 0.6 - 12)
         let rightPad = CGRect(x: right.minX, y: rightTop.maxY + 4, width: right.width, height: right.maxY - rightTop.maxY - 8)
-        return ZStack(alignment: .topLeading) {
+        let system = model.game.system, six = model.sixButtonPad
+        return AnyView(ZStack(alignment: .topLeading) {
             screen(in: leftScreen)
-            ControllerView(controls: ControllerLayout.bookLeft(leftPad.size, system: model.game.system, sixButton: model.sixButtonPad), model: model.controller)
-                .place(leftPad)
+            controllerArea(.bookLeft, rect: leftPad) { ControllerLayout.bookLeft(leftPad.size, system: system, sixButton: six, preset: $0) }
             HingeSeam(axis: .vertical).place(stage.fold.frame)
             CompanionPage(model: model, onQuit: onQuit).place(rightTop)
-            ControllerView(controls: ControllerLayout.bookRight(rightPad.size, system: model.game.system, sixButton: model.sixButtonPad), model: model.controller)
-                .place(rightPad)
+            controllerArea(.bookRight, rect: rightPad) { ControllerLayout.bookRight(rightPad.size, system: system, sixButton: six, preset: $0) }
             if model.menuOpen { menuPanel.place(right.insetBy(dx: 10, dy: 10)) }
-        }
+            if model.editor != nil { editorPanel.place(rightTop) }
+        })
     }
 
     private var portraitLayout: some View {
         let c = stage.canvas
+        if model.physicalMode {
+            let screenRect = CGRect(x: c.minX + 8, y: c.minY + 8, width: c.width - 16, height: min(c.height * 0.62, c.width * 0.9 + 34))
+            return AnyView(ZStack(alignment: .topLeading) {
+                screen(in: screenRect)
+                ControllerCompanion(model: model, onQuit: onQuit, compact: true)
+                    .place(CGRect(x: c.minX + 8, y: screenRect.maxY + 10, width: c.width - 16, height: c.maxY - screenRect.maxY - 18))
+                if model.menuOpen { menuPanel.place(c.insetBy(dx: 14, dy: c.height * 0.12)) }
+            })
+        }
         let screenH = min(c.width * 0.86 + 34, c.height * 0.5)
         let bezel = CGRect(x: c.minX + 12, y: c.minY + 10, width: c.width - 24, height: screenH)
         let deck = CGRect(x: c.minX + 4, y: bezel.maxY + 10, width: c.width - 8, height: c.maxY - bezel.maxY - 14)
-        return ZStack(alignment: .topLeading) {
+        return AnyView(ZStack(alignment: .topLeading) {
             screen(in: bezel)
-            deckBody(in: deck)
+            deckBody(in: deck, area: .portrait)
             if model.menuOpen { menuPanel.place(c.insetBy(dx: 14, dy: c.height * 0.12)) }
-        }
+            if model.editor != nil { editorPanel.place(bezel) }
+        })
     }
 
     private var landscapeLayout: some View {
         let c = stage.canvas
-        let fit = ScreenFit.rect(video: model.videoSize, in: CGSize(width: c.width * 0.62, height: c.height - 16),
-                                 mode: model.screenMode, displayScale: displayScale)
+        // With a controller: the whole height, pixel-perfect when "Auto" (integer scaling).
+        let physical = model.physicalMode
+        let mode: ScreenMode = physical && model.screenMode == .auto ? .integer : model.screenMode
+        let box = physical ? CGSize(width: c.width - 16, height: c.height - 8) : CGSize(width: c.width * 0.62, height: c.height - 16)
+        let fit = ScreenFit.rect(video: model.videoSize, in: box, mode: mode, displayScale: displayScale)
         let game = CGRect(x: c.midX - fit.size.width / 2, y: c.midY - fit.size.height / 2,
                           width: fit.size.width, height: fit.size.height)
+        let system = model.game.system, six = model.sixButtonPad
+        let gameInArea = game.offsetBy(dx: -c.minX, dy: -c.minY)
         return ZStack(alignment: .topLeading) {
-            GameScreen(frames: model.session.frames, mode: model.screenMode, integer: fit.integer)
+            GameScreen(frames: model.session.frames, mode: mode, integer: fit.integer)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .place(game)
-            ControllerView(controls: ControllerLayout.overlay(c.size, gameRect: game.offsetBy(dx: -c.minX, dy: -c.minY), system: model.game.system, sixButton: model.sixButtonPad),
-                           model: model.controller, floating: false)
-                .place(c)
+            if !physical {
+                controllerArea(.landscape, rect: c) {
+                    ControllerLayout.overlay(c.size, gameRect: gameInArea, system: system, sixButton: six, preset: $0)
+                }
+            }
             toastView.place(CGRect(x: game.minX, y: game.minY + 10, width: game.width, height: 40))
+            if physical && !model.menuOpen {
+                // With the game edge to edge, a small menu key stays reachable by touch.
+                Button { model.menuOpen = true } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.rounded(.footnote, weight: .bold))
+                        .foregroundStyle(Theme.ink)
+                        .frame(width: 36, height: 36)
+                        .background(Circle().fill(Color.black.opacity(0.45)))
+                }
+                .accessibilityLabel("Menu")
+                .accessibilityIdentifier("landscape.menu")
+                .place(CGRect(x: c.maxX - 44, y: c.minY + 6, width: 36, height: 36))
+            }
             if model.menuOpen { menuPanel.place(c.insetBy(dx: c.width * 0.2, dy: 14)) }
+            if model.editor != nil {
+                editorPanel.place(CGRect(x: c.midX - min(270, c.width * 0.3), y: c.minY + 6, width: min(540, c.width * 0.6), height: c.height * 0.62))
+            }
         }
     }
 
@@ -135,13 +195,43 @@ struct PlayerView: View {
         .place(rect)
     }
 
-    private func deckBody(in rect: CGRect) -> some View {
-        ZStack(alignment: .topLeading) {
+    private func deckBody(in rect: CGRect, area: ControllerArea) -> some View {
+        let system = model.game.system, six = model.sixButtonPad, size = rect.size
+        return ZStack(alignment: .topLeading) {
             VentSlots(columns: 5)
                 .position(x: rect.width * 0.86, y: rect.height * 0.88)
-            ControllerView(controls: ControllerLayout.deck(rect.size, system: model.game.system, sixButton: model.sixButtonPad), model: model.controller)
+            controllerArea(area, rect: CGRect(origin: .zero, size: size)) {
+                ControllerLayout.deck(size, system: system, sixButton: six, preset: $0)
+            }
         }
         .place(rect)
+    }
+
+    /// The touch controller for one area: the saved layout (game, then system), or the preset's
+    /// defaults; in edit mode, the editor for that area instead.
+    @ViewBuilder
+    private func controllerArea(_ area: ControllerArea, rect: CGRect,
+                                defaults: @escaping (LayoutPreset) -> [Control]) -> some View {
+        if let editor = model.editor {
+            LayoutEditorArea(editor: editor, model: model.controller, area: area, size: rect.size, defaults: defaults)
+                .place(rect)
+        } else {
+            let r = model.layouts.controls(model.game.system, area, game: model.game.id, size: rect.size, defaults: defaults)
+            ControllerView(controls: r.controls, model: model.controller, settings: r.settings, floating: area == .landscape)
+                .place(rect)
+        }
+    }
+
+    private var editorPanel: some View {
+        Group {
+            if let editor = model.editor {
+                ScrollView {
+                    LayoutEditorPanel(editor: editor, onDone: { model.endEditingControls() },
+                                      onCancel: { model.endEditingControls() })
+                }
+                .scrollIndicators(.hidden)
+            }
+        }
     }
 
     @ViewBuilder private var toastView: some View {

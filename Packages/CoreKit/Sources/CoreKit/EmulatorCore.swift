@@ -106,6 +106,11 @@ public protocol EmulatorCore: AnyObject {
     func reset()
     /// The only hot call: emulate one video frame with the given input held.
     func runFrame(input: InputState)
+    /// How many controllers the core can read (1 unless it wires up more ports).
+    var maxPlayers: Int { get }
+    /// Emulate one frame with one `InputState` per player (index 0 = player 1). Missing players
+    /// are released; extras beyond `maxPlayers` are ignored.
+    func runFrame(inputs: [InputState])
     /// BGRA8 pixels (as little-endian 0xAARRGGBB words), `videoSize`, owned by the core.
     var framebuffer: UnsafeBufferPointer<UInt32> { get }
     /// Moves every sample produced since the last call into `ring`.
@@ -116,6 +121,11 @@ public protocol EmulatorCore: AnyObject {
     var batteryRAM: Data? { get }
     func saveState() -> Data
     func loadState(_ data: Data) throws
+}
+
+public extension EmulatorCore {
+    var maxPlayers: Int { 1 }
+    func runFrame(inputs: [InputState]) { runFrame(input: inputs.first ?? []) }
 }
 
 /// Identifies a file's system. (Building the core is the app's job: it imports each core module.)

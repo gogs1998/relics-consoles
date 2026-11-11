@@ -60,6 +60,19 @@
 			</array>
 		</dict>
 	</array>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.iqlabs.duoemulator.layout</string>
+			<key>UTTypeDescription</key>
+			<string>Foldback controller layout</string>
+			<key>UTTypeConformsTo</key>
+			<array><string>public.json</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict><key>public.filename-extension</key><array><string>foldlayout</string></array></dict>
+		</dict>
+	</array>
 	<key>UTImportedTypeDeclarations</key>
 	<array>
 		<dict>

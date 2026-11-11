@@ -8,7 +8,7 @@ final class TouchInputUITests: XCTestCase {
     @MainActor
     func testTouchControllerDrivesTheGame() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-pose", "table", "-autoplay", "demo.nes", "-freshStart", "YES"]
+        app.launchArguments = ["-pose", "table", "-autoplay", "demo.nes", "-freshStart", "YES", "-keepTouchControls", "YES"]
         app.launch()
         let pad = app.descendants(matching: .any)["Direction pad"]
         XCTAssertTrue(pad.waitForExistence(timeout: 10))
@@ -34,6 +34,7 @@ final class TouchInputUITests: XCTestCase {
         XCTAssertNotEqual(bits & (1 << 4), 0, "A never registered (bits \(bits))")
         XCTAssertNotEqual(bits & (1 << 5), 0, "B never registered (bits \(bits))")
         XCTAssertEqual(bits & (1 << 10 | 1 << 11), 0, "Start/Select pressed by accident")
+        app.terminate()
     }
 
     @MainActor

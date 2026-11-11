@@ -9,6 +9,12 @@ struct DuoEmulatorApp: App {
     init() {
         #if DEBUG
         // -duoAspect NO: draw like an ordinary iPhone (no 1.42 letterbox) for "plain phone" checks.
+        // -resetLayouts YES: start from the built-in controller layouts (UI tests).
+        if UserDefaults.standard.bool(forKey: "resetLayouts") {
+            let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("Layouts")
+            try? FileManager.default.removeItem(at: dir)
+        }
         if UserDefaults.standard.object(forKey: "duoAspect") != nil, !UserDefaults.standard.bool(forKey: "duoAspect") {
             MainActor.assumeIsolated { FoldSimulator.shared.constrainToDuoAspect = false }
         }

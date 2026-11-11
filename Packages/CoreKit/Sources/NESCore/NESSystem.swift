@@ -11,7 +11,8 @@ public final class NESSystem: EmulatorCore {
     public let pixelAspect = 8.0 / 7.0
     public let frameRate = 1_789_773.0 / 29_780.5
     public let audioSampleRate = 48_000.0
-    public let stateVersion: UInt32 = 1
+    public let stateVersion: UInt32 = 2
+    public let maxPlayers = 2
 
     let cart: Cartridge
     let mapper: Mapper
@@ -41,6 +42,9 @@ public final class NESSystem: EmulatorCore {
     var padState: UInt8 = 0
     var padShift: UInt8 = 0
     var padStrobe = false
+    // second controller ($4017), shares the $4016 strobe
+    var pad2State: UInt8 = 0
+    var pad2Shift: UInt8 = 0
     var openBus: UInt8 = 0
 
     public init(rom: Data, battery: Data?) throws {
@@ -84,6 +88,23 @@ public final class NESSystem: EmulatorCore {
     }
 
     public func runFrame(input: InputState) {
+        runFrame(inputs: [input])
+    }
+
+    public func runFrame(inputs: [InputState]) {
+        padState = Self.padByte(inputs.first ?? [])
+        pad2State = Self.padByte(inputs.count > 1 ? inputs[1] : [])
+        ppu.frameComplete = false
+        var guardCycles = 0
+        while !ppu.frameComplete && guardCycles < 40_000 {
+            let before = cycles
+            stepInstruction()
+            guardCycles += Int(cycles &- before)
+        }
+    }
+
+    /// Standard controller shift-register order: A, B, Select, Start, Up, Down, Left, Right.
+    static func padByte(_ input: InputState) -> UInt8 {
         let i = input.sanitised
         var p: UInt8 = 0
         if i.contains(.a) { p |= 0x01 }
@@ -94,14 +115,7 @@ public final class NESSystem: EmulatorCore {
         if i.contains(.down) { p |= 0x20 }
         if i.contains(.left) { p |= 0x40 }
         if i.contains(.right) { p |= 0x80 }
-        padState = p
-        ppu.frameComplete = false
-        var guardCycles = 0
-        while !ppu.frameComplete && guardCycles < 40_000 {
-            let before = cycles
-            stepInstruction()
-            guardCycles += Int(cycles &- before)
-        }
+        return p
     }
 
     public func drainAudio(into ring: AudioRing) {
@@ -139,6 +153,7 @@ public final class NESSystem: EmulatorCore {
         st.sync(&cycles); st.sync(&needNMI); st.sync(&prevNeedNMI); st.sync(&prevNMILine); st.sync(&runIRQ)
         st.sync(&prevRunIRQ); st.sync(&jammed)
         st.sync(&padShift); st.sync(&padStrobe); st.sync(&openBus)
+        st.sync(&padState); st.sync(&pad2State); st.sync(&pad2Shift)
         st.bytes(ram, count: 0x800)
         cart.sync(&st)
         mapper.sync(&st)
@@ -218,7 +233,14 @@ public final class NESSystem: EmulatorCore {
             }
             return (openBus & 0xE0) | bit
         case 0x4017:
-            return (openBus & 0xE0)
+            let bit: UInt8
+            if padStrobe {
+                bit = pad2State & 1
+            } else {
+                bit = pad2Shift & 1
+                pad2Shift = (pad2Shift >> 1) | 0x80
+            }
+            return (openBus & 0xE0) | bit
         default:
             return openBus
         }
@@ -238,9 +260,9 @@ public final class NESSystem: EmulatorCore {
             oamDMA(page: value)
         case 0x4016:
             let newStrobe = (value & 1) != 0
-            if padStrobe && !newStrobe { padShift = padState }
+            if padStrobe && !newStrobe { padShift = padState; pad2Shift = pad2State }
             padStrobe = newStrobe
-            if padStrobe { padShift = padState }
+            if padStrobe { padShift = padState; pad2Shift = pad2State }
         case 0x4000...0x4013, 0x4015, 0x4017:
             apu.writeRegister(addr, value)
         default:

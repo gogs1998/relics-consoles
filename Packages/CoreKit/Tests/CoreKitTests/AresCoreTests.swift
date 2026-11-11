@@ -179,6 +179,75 @@ import Testing
         #expect(fps > 60)
     }
 
+    // MARK: second player
+
+    @Test func snesSecondPadIsSeparate() throws {
+        let s = try snes()
+        #expect(s.maxPlayers == 2)
+        for _ in 0..<30 { s.runFrame(inputs: [[], []]) }
+        let idle = centre(s)
+        #expect(isBlue(idle))
+        // Player 2 alone: the demo reads only pad 1 ($4218), so the screen stays blue...
+        for _ in 0..<3 { s.runFrame(inputs: [[], [.b, .start]]) }
+        #expect(centre(s) == idle)
+        // ...but the core's auto-joypad read polled port 2 and saw exactly player 2's buttons.
+        let p2 = s.debugPortReads(1), p1 = s.debugPortReads(0)
+        #expect(p2.reads > 0, "port 2 never polled")
+        #expect(p2.seen == SNESSystem.bits([.b, .start]), "\(String(p2.seen, radix: 16))")
+        #expect(p1.reads > 0)
+        #expect(p1.seen == 0, "player 2 leaked into port 1: \(String(p1.seen, radix: 16))")
+        // Both held: player 1 still drives the game; each port reads its own buttons.
+        for _ in 0..<3 { s.runFrame(inputs: [[.a], [.x, .l]]) }
+        #expect(isRed(centre(s)))
+        #expect(s.debugPortReads(0).seen == SNESSystem.bits([.a]))
+        #expect(s.debugPortReads(1).seen == SNESSystem.bits([.x, .l]))
+        // The single-player call releases port 2.
+        s.runFrame(input: [])
+        s.runFrame(input: [])
+        #expect(s.debugPortReads(1).seen == 0)
+        #expect(isBlue(centre(s)))
+    }
+
+    @Test func snesStateRoundTripWithTwoPads() throws {
+        let s = try snes()
+        for _ in 0..<20 { s.runFrame(inputs: [[], [.y]]) }
+        let state = s.saveState()
+        #expect(!state.isEmpty)
+        for _ in 0..<5 { s.runFrame(inputs: [[.a], [.b]]) }
+        #expect(isRed(centre(s)))
+        try s.loadState(state)
+        s.runFrame(inputs: [[], [.y]])
+        #expect(isBlue(centre(s)))
+        #expect(s.saveState().count == state.count)
+    }
+
+    /// The Mega Drive demo reads only port 1, so port 2 is smoke-tested: a pad is connected, setting
+    /// it doesn't disturb port 1, and states still round-trip.
+    @Test func mdSecondPadDoesNotDisturbPort1() throws {
+        let m = try md()
+        #expect(m.maxPlayers == 2)
+        for _ in 0..<30 { m.runFrame(inputs: [[], []]) }
+        let idle = centre(m)
+        #expect(isBlue(idle))
+        for _ in 0..<3 { m.runFrame(inputs: [[], [.b, .y, .a]]) }
+        #expect(centre(m) == idle, "player 2 leaked into port 1")
+        let p1 = m.debugPortReads(0)
+        #expect(p1.seen == 0)
+        let p2 = m.debugPortReads(1)
+        if p2.reads > 0 { #expect(p2.seen == MDSystem.bits([.b, .y, .a])) }
+        print("MD port 2 reads in the last frame: \(p2.reads)")
+        for _ in 0..<3 { m.runFrame(inputs: [[.b], [.a]]) }
+        #expect(isRed(centre(m)))
+        #expect(m.debugPortReads(0).seen == MDSystem.bits([.b]))
+        let state = m.saveState()
+        for _ in 0..<5 { m.runFrame(inputs: [[], [.b]]) }
+        #expect(isBlue(centre(m)))
+        try m.loadState(state)
+        m.runFrame(inputs: [[.b], []])
+        #expect(isRed(centre(m)))
+        #expect(m.saveState().count == state.count)
+    }
+
     // MARK: lifecycle
 
     @Test func oneCoreAtATime() throws {

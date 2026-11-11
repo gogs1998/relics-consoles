@@ -49,6 +49,17 @@ struct PlayerMenu: View {
                 .tint(Theme.ember)
             }
             HStack(spacing: 8) {
+                Button { model.beginEditingControls() } label: { Label("Edit controls", systemImage: "slider.horizontal.3") }
+                    .buttonStyle(ChipStyle(selected: false))
+                    .accessibilityIdentifier("menu.editControls")
+                Button {
+                    model.showingControllers = true
+                    model.menuOpen = false
+                } label: { Label("Controllers", systemImage: "gamecontroller") }
+                    .buttonStyle(ChipStyle(selected: false))
+                    .accessibilityIdentifier("menu.controllers")
+            }
+            HStack(spacing: 8) {
                 Button { model.reset() } label: { Label("Reset", systemImage: "arrow.counterclockwise") }
                     .buttonStyle(ChipStyle(selected: false))
                 Button { model.startOver() } label: { Label("Start over", systemImage: "backward.end.fill") }

@@ -91,7 +91,7 @@ struct TouchSurface: UIViewRepresentable {
                     guard r.contains(p) else { continue }
                     switch c.kind {
                     case .dpad: return .dpad
-                    case .face, .shoulder: return .buttons
+                    case .face, .shoulder, .combo: return .buttons
                     case .pill(let s, _): return .pill(s)
                     case .menu: return .menu
                     case .fastForward: return .fastForward
@@ -111,7 +111,8 @@ struct TouchSurface: UIViewRepresentable {
                 switch owner {
                 case .dpad:
                     guard let pad = controls.first(where: { $0.kind == .dpad }) else { break }
-                    let (bits, v) = Self.dpad(p, in: pad.frame)
+                    let st = model?.settings ?? ControlSettings()
+                    let (bits, v) = Self.dpad(p, in: pad.frame, diagonal: st.diagonalDegrees, deadZone: st.deadZone)
                     pressed.formUnion(bits)
                     vector = v
                 case .buttons:
@@ -124,7 +125,7 @@ struct TouchSurface: UIViewRepresentable {
                             let reach = controls.filter { if case .face = $0.kind { true } else { false } }.count > 2 ? 1.1 : 1.3
                             let r = c.frame.width * 0.5 * reach
                             if hypot(p.x - centre.x, p.y - centre.y) <= r { pressed.insert(s) }
-                        case .shoulder(let s, _):
+                        case .shoulder(let s, _), .combo(let s, _):
                             if c.hitFrame.contains(p) { pressed.insert(s) }
                         default: break
                         }
@@ -145,12 +146,20 @@ struct TouchSurface: UIViewRepresentable {
             }
         }
 
-        /// Eight-way with an 18 % dead zone. Each cardinal zone spans 105 degrees, so the 30-degree
-        /// overlaps centred on the diagonals press two directions.
-        static func dpad(_ p: CGPoint, in frame: CGRect) -> (InputState, CGVector) {
+        /// Eight-way with a dead zone (default 15 % of the radius). Each cardinal zone spans
+        /// 90 + `diagonal` degrees, so the overlaps (`diagonal` degrees wide, centred on the
+        /// diagonals) press two directions; `diagonal` 0 makes the pad four-way.
+        static func dpad(_ p: CGPoint, in frame: CGRect, diagonal: Double = 36, deadZone: Double = 0.15) -> (InputState, CGVector) {
             let dx = p.x - frame.midX, dy = p.y - frame.midY
             let dist = hypot(dx, dy)
-            guard dist > frame.width * 0.5 * 0.18 else { return ([], .zero) }
+            guard dist > frame.width * 0.5 * deadZone else { return ([], .zero) }
+            if diagonal <= 0 {
+                // Four-way: the dominant axis wins.
+                let v = CGVector(dx: dx / dist, dy: dy / dist)
+                if abs(dx) >= abs(dy) { return (dx > 0 ? .right : .left, v) }
+                return (dy > 0 ? .down : .up, v)
+            }
+            let half = 45 + min(60, diagonal) / 2
             var angle = atan2(-dy, dx) * 180 / .pi   // 0 = right, 90 = up
             if angle < 0 { angle += 360 }
             var s: InputState = []
@@ -159,10 +168,10 @@ struct TouchSurface: UIViewRepresentable {
                 if d > 180 { d = 360 - d }
                 return d <= half
             }
-            if within(0, 52.5) { s.insert(.right) }
-            if within(90, 52.5) { s.insert(.up) }
-            if within(180, 52.5) { s.insert(.left) }
-            if within(270, 52.5) { s.insert(.down) }
+            if within(0, half) { s.insert(.right) }
+            if within(90, half) { s.insert(.up) }
+            if within(180, half) { s.insert(.left) }
+            if within(270, half) { s.insert(.down) }
             let v = CGVector(dx: dx / dist, dy: dy / dist)
             return (s, v)
         }

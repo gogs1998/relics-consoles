@@ -65,7 +65,22 @@ public class AresMachine {
 
     public func reset() { ares_reset(handle) }
 
-    func run(buttons: UInt32) { ares_run_frame(handle, buttons) }
+    /// Both controller ports are connected (same pad type in each).
+    public var maxPlayers: Int { 2 }
+
+    /// Sets ports 1 and 2 (a missing player is released) and runs one frame.
+    func run(ports: [UInt32]) {
+        ares_set_input(handle, 0, ports.first ?? 0)
+        ares_set_input(handle, 1, ports.count > 1 ? ports[1] : 0)
+        ares_run_frame_ports(handle)
+    }
+
+    /// Tests: button reads the core made from `port` (0 or 1) in the last frame, and the pressed bits it saw.
+    func debugPortReads(_ port: UInt32) -> (reads: UInt32, seen: UInt32) {
+        var seen: UInt32 = 0
+        let reads = ares_debug_port_reads(handle, port, &seen)
+        return (reads, seen)
+    }
 
     public var framebuffer: UnsafeBufferPointer<UInt32> {
         var w: UInt32 = 0, h: UInt32 = 0
@@ -113,6 +128,18 @@ public class AresMachine {
         if !ok { throw CoreError.stateMismatch("not a save state for this game") }
     }
 
+    /// D-pad, Start and Select/Mode bits shared by both systems (input already sanitised).
+    static func directionBits(_ i: InputState) -> UInt32 {
+        var b: UInt32 = 0
+        if i.contains(.up) { b |= UInt32(ARES_BTN_UP) }
+        if i.contains(.down) { b |= UInt32(ARES_BTN_DOWN) }
+        if i.contains(.left) { b |= UInt32(ARES_BTN_LEFT) }
+        if i.contains(.right) { b |= UInt32(ARES_BTN_RIGHT) }
+        if i.contains(.start) { b |= UInt32(ARES_BTN_START) }
+        if i.contains(.select) { b |= UInt32(ARES_BTN_SELECT) }
+        return b
+    }
+
     static func crc32(_ data: Data) -> UInt32 {
         var table = [UInt32](repeating: 0, count: 256)
         for i in 0..<256 {
@@ -157,22 +184,25 @@ public final class SNESSystem: AresMachine, EmulatorCore {
         return base * 256.0 / Double(size.width) * (size.height > 300 ? 2 : 1)
     }
 
+    /// Player 1 only; port 2 is released.
     public func runFrame(input: InputState) {
+        run(ports: [Self.bits(input)])
+    }
+
+    public func runFrame(inputs: [InputState]) {
+        run(ports: inputs.prefix(2).map(Self.bits))
+    }
+
+    static func bits(_ input: InputState) -> UInt32 {
         let i = input.sanitised
-        var b: UInt32 = 0
-        if i.contains(.up) { b |= UInt32(ARES_BTN_UP) }
-        if i.contains(.down) { b |= UInt32(ARES_BTN_DOWN) }
-        if i.contains(.left) { b |= UInt32(ARES_BTN_LEFT) }
-        if i.contains(.right) { b |= UInt32(ARES_BTN_RIGHT) }
-        if i.contains(.start) { b |= UInt32(ARES_BTN_START) }
-        if i.contains(.select) { b |= UInt32(ARES_BTN_SELECT) }
+        var b = AresMachine.directionBits(i)
         if i.contains(.b) { b |= UInt32(ARES_SNES_B) }
         if i.contains(.y) { b |= UInt32(ARES_SNES_Y) }
         if i.contains(.a) { b |= UInt32(ARES_SNES_A) }
         if i.contains(.x) { b |= UInt32(ARES_SNES_X) }
         if i.contains(.l) { b |= UInt32(ARES_SNES_L) }
         if i.contains(.r) { b |= UInt32(ARES_SNES_R) }
-        run(buttons: b)
+        return b
     }
 }
 
@@ -194,21 +224,24 @@ public final class MDSystem: AresMachine, EmulatorCore {
 
     /// InputState → 6-button pad: y→A, b→B, a→C (so the bottom row Y/B/A reads A/B/C left to right),
     /// x→X, l→Y, r→Z, select→Mode, start→Start.
+    /// Player 1 only; port 2 is released.
     public func runFrame(input: InputState) {
+        run(ports: [Self.bits(input)])
+    }
+
+    public func runFrame(inputs: [InputState]) {
+        run(ports: inputs.prefix(2).map(Self.bits))
+    }
+
+    static func bits(_ input: InputState) -> UInt32 {
         let i = input.sanitised
-        var b: UInt32 = 0
-        if i.contains(.up) { b |= UInt32(ARES_BTN_UP) }
-        if i.contains(.down) { b |= UInt32(ARES_BTN_DOWN) }
-        if i.contains(.left) { b |= UInt32(ARES_BTN_LEFT) }
-        if i.contains(.right) { b |= UInt32(ARES_BTN_RIGHT) }
-        if i.contains(.start) { b |= UInt32(ARES_BTN_START) }
-        if i.contains(.select) { b |= UInt32(ARES_BTN_SELECT) }
+        var b = AresMachine.directionBits(i)
         if i.contains(.y) { b |= UInt32(ARES_MD_A) }
         if i.contains(.b) { b |= UInt32(ARES_MD_B) }
         if i.contains(.a) { b |= UInt32(ARES_MD_C) }
         if i.contains(.x) { b |= UInt32(ARES_MD_X) }
         if i.contains(.l) { b |= UInt32(ARES_MD_Y) }
         if i.contains(.r) { b |= UInt32(ARES_MD_Z) }
-        run(buttons: b)
+        return b
     }
 }

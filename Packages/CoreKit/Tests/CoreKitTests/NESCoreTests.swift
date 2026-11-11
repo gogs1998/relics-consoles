@@ -87,3 +87,79 @@ func framebufferHash(_ fb: UnsafeBufferPointer<UInt32>) -> UInt32 {
         #expect(result == 0, "\(name) failed test \(result)")
     }
 }
+
+/// The second controller on $4017, read through the CPU-visible bus path (`read`/`write` tick the
+/// machine like real accesses).
+@Suite struct NESTwoPlayerTests {
+    /// Strobes $4016, then reads `port` eight times; returns bit 0 of each read.
+    private func shiftOut(_ nes: NESSystem, port: UInt16) -> [UInt8] {
+        nes.write(0x4016, 1)
+        nes.write(0x4016, 0)
+        return (0..<8).map { _ in nes.read(port) & 1 }
+    }
+
+    private func bits(_ byte: UInt8) -> [UInt8] { (0..<8).map { (byte >> $0) & 1 } }
+
+    @Test func reportsTwoPlayers() throws {
+        let nes = try NESSystem(rom: try testROM("demo.nes"), battery: nil)
+        #expect(nes.maxPlayers == 2)
+        #expect(nes.stateVersion == 2)
+    }
+
+    @Test func player2BitsArriveInOrderAndDontLeak() throws {
+        let nes = try NESSystem(rom: try testROM("demo.nes"), battery: nil)
+        nes.runFrame(inputs: [[.a, .up], [.b, .start, .right]])
+        #expect(nes.padState == NESSystem.padByte([.a, .up]))
+        #expect(nes.pad2State == NESSystem.padByte([.b, .start, .right]))
+        // Order A, B, Select, Start, Up, Down, Left, Right.
+        #expect(shiftOut(nes, port: 0x4017) == [0, 1, 0, 1, 0, 0, 0, 1])
+        #expect(shiftOut(nes, port: 0x4016) == [1, 0, 0, 0, 1, 0, 0, 0])
+        // Interleaved reads: each port shifts independently.
+        nes.write(0x4016, 1); nes.write(0x4016, 0)
+        var p1: [UInt8] = [], p2: [UInt8] = []
+        for _ in 0..<8 { p1.append(nes.read(0x4016) & 1); p2.append(nes.read(0x4017) & 1) }
+        #expect(p1 == bits(NESSystem.padByte([.a, .up])))
+        #expect(p2 == bits(NESSystem.padByte([.b, .start, .right])))
+        // After eight reads both report 1s (official pads).
+        #expect(nes.read(0x4017) & 1 == 1)
+        #expect(nes.read(0x4016) & 1 == 1)
+    }
+
+    @Test func player2OnlyAndUpperBitsAreOpenBus() throws {
+        let nes = try NESSystem(rom: try testROM("demo.nes"), battery: nil)
+        nes.runFrame(inputs: [[], [.select, .left]])
+        #expect(shiftOut(nes, port: 0x4016) == [0, 0, 0, 0, 0, 0, 0, 0])
+        #expect(shiftOut(nes, port: 0x4017) == [0, 0, 1, 0, 0, 0, 1, 0])
+        // Bits 1-4 are never driven; bits 5-7 come from open bus (on hardware, the operand's $40).
+        nes.write(0x4016, 1); nes.write(0x4016, 0)
+        nes.openBus = 0xFF
+        #expect(nes.read(0x4017) & 0xFE == 0xE0)
+        // While strobe is high, $4017 keeps returning the first bit (Select is bit 2, so A = 0).
+        nes.write(0x4016, 1)
+        #expect((0..<4).map { _ in nes.read(0x4017) & 1 } == [0, 0, 0, 0])
+        nes.write(0x4016, 0)
+    }
+
+    @Test func singlePlayerCallReleasesPlayer2() throws {
+        let nes = try NESSystem(rom: try testROM("demo.nes"), battery: nil)
+        nes.runFrame(inputs: [[], [.a]])
+        nes.runFrame(input: [.b])
+        #expect(nes.pad2State == 0)
+        #expect(nes.padState == NESSystem.padByte([.b]))
+        nes.runFrame(inputs: [])
+        #expect(nes.padState == 0 && nes.pad2State == 0)
+    }
+
+    @Test func saveStateKeepsPlayer2ShiftPosition() throws {
+        let nes = try NESSystem(rom: try testROM("demo.nes"), battery: nil)
+        nes.runFrame(inputs: [[], [.a, .start, .down]])
+        nes.write(0x4016, 1); nes.write(0x4016, 0)
+        _ = nes.read(0x4017); _ = nes.read(0x4017)        // A, B consumed
+        let state = nes.saveState()
+        let rest = (0..<6).map { _ in nes.read(0x4017) & 1 }
+        #expect(rest == [0, 1, 0, 1, 0, 0])
+        nes.runFrame(inputs: [])                         // changes pad state and shift
+        try nes.loadState(state)
+        #expect((0..<6).map { _ in nes.read(0x4017) & 1 } == rest)
+    }
+}

@@ -68,14 +68,19 @@ Fable review changes in §10) and `docs/research.md` (App Store 4.7, core licens
   ring; fast-forward x3; rewind ring of states every 4 frames capped at 8 MB), `FrameExchange` (lock + latest
   frame), `GameScreen`/`Renderer` (MTKView, one quad, `Shaders.metal`: sharp-bilinear, nearest, scanlines, LCD;
   `ScreenFit` picks integer scaling in device pixels when it fills ≥ 85 %), `AudioOutput` (AVAudioSourceNode
-  built in a `nonisolated static` helper), `PhysicalInput` (GCController + GCKeyboard), `ControllerModel` +
+  built in a `nonisolated static` helper), `GamepadHub` (GCController + GCKeyboard), `ControllerModel` +
   `TouchSurface` (UIKit multi-touch, per-touch ownership) + `ControllerView` (the Graphite and Ember
   controller drawing), `PlayerView` (table / book / portrait / landscape arrangements), `PlayerMenu`,
   `LibraryView` (+ `GameCard`, generated labels).
 
 ## DEBUG launch arguments
 `-pose table|book|flat`, `-autoplay demo.nes` (a bundled test cart by file name), `-holdInput right,a`,
-`-openMenu YES`, `-freshStart YES` (ignore the auto-save).
+`-openMenu YES`, `-freshStart YES` (ignore the auto-save), `-resetLayouts YES` (built-in touch layouts),
+`-keepTouchControls YES` (the simulator may expose a virtual "Gamepad", which hides the touch controller),
+`-fakeController YES` (pretend a pad is connected).
+- Controls: `ControllerLayout` (presets: standard, 6-Button Arcade), `LayoutStore` (game → system → preset),
+  `LayoutEditor` + `LayoutEditorArea` + `LayoutEditorPanel`; `GamepadHub` (GameController + keyboard, players,
+  hotkeys via CoreKit `InputMapper`, remap capture), `ControllersSheet`, `ControllerCompanion`.
 
 ## Conventions
 - Dynamic Type text styles only (`Font.rounded(_:weight:)`), never fixed point sizes for text.

@@ -61,6 +61,11 @@ final class InputLatch: Sendable {
     let touch = Atomic<UInt32>(0)
     let controller = Atomic<UInt32>(0)
     let keyboard = Atomic<UInt32>(0)
+    /// Player 2 (a second controller), for systems with two ports.
+    let player2 = Atomic<UInt32>(0)
+    /// Buttons that auto-fire while held, and the half-period in frames.
+    let autoFire = Atomic<UInt32>(0)
+    let autoFireHalfPeriod = Atomic<Int>(3)
 
     var current: InputState {
         InputState(rawValue: touch.load(ordering: .relaxed) | controller.load(ordering: .relaxed)
@@ -97,7 +102,7 @@ final class EmulatorSession: @unchecked Sendable {
 
     /// Reported back to the main actor.
     var onError: (@Sendable (String) -> Void)?
-    var onStarted: (@Sendable (_ videoWidth: Int, _ videoHeight: Int, _ romCRC: UInt32, _ stateVersion: UInt32) -> Void)?
+    var onStarted: (@Sendable (_ videoWidth: Int, _ videoHeight: Int, _ romCRC: UInt32, _ stateVersion: UInt32, _ players: Int) -> Void)?
     /// The core changed resolution (Mega Drive 256/320 wide, SNES hi-res).
     var onVideoSize: (@Sendable (_ videoWidth: Int, _ videoHeight: Int) -> Void)?
 
@@ -164,7 +169,7 @@ final class EmulatorSession: @unchecked Sendable {
             onError?((error as? LocalizedError)?.errorDescription ?? "This game couldn't be started.")
             return
         }
-        onStarted?(core.videoSize.width, core.videoSize.height, Self.romCRC(core, rom: rom), core.stateVersion)
+        onStarted?(core.videoSize.width, core.videoSize.height, Self.romCRC(core, rom: rom), core.stateVersion, core.maxPlayers)
 
         var lastSize = core.videoSize
         let basePeriod = 1.0 / core.frameRate
@@ -222,9 +227,15 @@ final class EmulatorSession: @unchecked Sendable {
                     discardAudio(core)
                 }
             } else {
-                let held = input.current
+                var held = input.current
+                let fire = InputState(rawValue: input.autoFire.load(ordering: .relaxed))
+                if !fire.isEmpty {
+                    let half = max(1, input.autoFireHalfPeriod.load(ordering: .relaxed))
+                    if (frameCount / half) % 2 == 1 { held.subtract(fire) }
+                }
+                let p2 = InputState(rawValue: input.player2.load(ordering: .relaxed)).sanitised
                 for i in 0..<speed {
-                    core.runFrame(input: held)
+                    if core.maxPlayers > 1 { core.runFrame(inputs: [held, p2]) } else { core.runFrame(input: held) }
                     frameCount += 1
                     if frameCount % rewindInterval == 0 { pushRewind(core.saveState()) }
                     if i < speed - 1 { discardAudio(core) }

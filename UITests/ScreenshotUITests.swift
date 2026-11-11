@@ -7,7 +7,10 @@ final class ScreenshotUITests: XCTestCase {
     private let outDir = "/private/tmp/duo-emulator-uitest"
 
     override func tearDown() async throws {
-        await MainActor.run { XCUIDevice.shared.orientation = .portrait }
+        await MainActor.run {
+            XCUIApplication().terminate()
+            XCUIDevice.shared.orientation = .portrait
+        }
         try await super.tearDown()
     }
 
@@ -16,7 +19,8 @@ final class ScreenshotUITests: XCTestCase {
                        before: ((XCUIApplication) -> Void)? = nil) {
         XCUIDevice.shared.orientation = landscape ? .landscapeLeft : .portrait
         let app = XCUIApplication()
-        app.launchArguments = args
+        // The simulator may expose a virtual "Gamepad"; keep the touch controller for these shots.
+        app.launchArguments = args + ["-keepTouchControls", "YES"]
         app.launch()
         sleep(wait)
         before?(app)
@@ -89,7 +93,7 @@ final class ScreenshotUITests: XCTestCase {
     @MainActor func testAudioFlows() throws {
         XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication()
-        app.launchArguments = ["-pose", "table", "-autoplay", "demo.nes", "-freshStart", "YES"]
+        app.launchArguments = ["-pose", "table", "-autoplay", "demo.nes", "-freshStart", "YES", "-keepTouchControls", "YES"]
         app.launch()
         sleep(5)
         let readout = app.descendants(matching: .any)["debug.audio"]

@@ -338,7 +338,14 @@ struct AresHandle : ares::Platform {
   double audioRate = 48000;
   double refreshRate = 60;
   bool pal = false;
-  uint32_t buttons = 0;
+  // Held buttons per controller port (index 0 = port 1).
+  uint32_t buttons[2] = {0, 0};
+  // The peripherals connected to ports 1 and 2 (identifies which port a polled button belongs to).
+  const void* peripheral[2] = {nullptr, nullptr};
+  // Debug: per port, how many button reads the core made and which pressed bits it saw,
+  // since the start of the last ares_run_frame.
+  uint32_t debugReads[2] = {0, 0};
+  uint32_t debugSeen[2] = {0, 0};
   ares::Event lastEvent = ares::Event::None;
   uint32_t frames = 0;
 
@@ -463,7 +470,14 @@ struct AresHandle : ares::Platform {
       else if(name == "Y") bit = ARES_MD_Y;
       else if(name == "Z") bit = ARES_MD_Z;
     }
-    button->setValue(bit && (buttons & bit));
+    u32 port = 0;
+    if(auto parent = node->parent().lock()) {
+      if(peripheral[1] && (const void*)parent.get() == peripheral[1]) port = 1;
+    }
+    bool pressed = bit && (buttons[port] & bit);
+    button->setValue(pressed);
+    debugReads[port]++;
+    if(pressed) debugSeen[port] |= bit;
   }
 
   // ---- helpers ----
@@ -491,6 +505,18 @@ struct AresHandle : ares::Platform {
 
 static void setError(char* error, size_t size, const char* text) {
   if(error && size) { std::strncpy(error, text, size - 1); error[size - 1] = 0; }
+}
+
+// The same pad type in controller ports 1 and 2.
+static void connectPads(AresHandle* h, const char* type) {
+  const char* names[2] = {"Controller Port 1", "Controller Port 2"};
+  for(int i = 0; i < 2; i++) {
+    if(auto port = h->root->find<ares::Node::Port>(names[i])) {
+      auto pad = port->allocate(type);
+      port->connect();
+      h->peripheral[i] = pad ? (const void*)static_cast<ares::Core::Object*>(pad.get()) : nullptr;
+    }
+  }
 }
 
 static bool buildSNES(AresHandle* h, std::vector<u8> rom, const uint8_t* save, size_t saveSize, char* error, size_t errorSize) {
@@ -531,7 +557,7 @@ static bool buildSNES(AresHandle* h, std::vector<u8> rom, const uint8_t* save, s
     return false;
   }
   if(auto port = h->root->find<ares::Node::Port>("Cartridge Slot")) { port->allocate(); port->connect(); }
-  if(auto port = h->root->find<ares::Node::Port>("Controller Port 1")) { port->allocate("Gamepad"); port->connect(); }
+  connectPads(h, "Gamepad");
   return true;
 }
 
@@ -568,7 +594,7 @@ static bool buildMD(AresHandle* h, std::vector<u8> rom, const uint8_t* save, siz
     return false;
   }
   if(auto port = h->root->find<ares::Node::Port>("Cartridge Slot")) { port->allocate(); port->connect(); }
-  if(auto port = h->root->find<ares::Node::Port>("Controller Port 1")) { port->allocate("Fighting Pad"); port->connect(); }
+  connectPads(h, "Fighting Pad");
   return true;
 }
 
@@ -615,7 +641,9 @@ void ares_destroy(AresHandle* h) {
 void ares_reset(AresHandle* h) { h->root->power(true); }
 
 void ares_run_frame(AresHandle* h, uint32_t buttons) {
-  h->buttons = buttons;
+  h->buttons[0] = buttons;
+  h->debugReads[0] = h->debugReads[1] = 0;
+  h->debugSeen[0] = h->debugSeen[1] = 0;
   h->runUntilFrame();
   h->frames++;
 }
@@ -660,6 +688,23 @@ bool ares_load_state(AresHandle* h, const uint8_t* data, size_t size) {
   if(!data || !size) return false;
   serializer s(data, (u32)size);
   return h->root->unserialize(s);
+}
+
+void ares_set_input(AresHandle* h, uint32_t port, uint32_t buttons) {
+  if(port < 2) h->buttons[port] = buttons;
+}
+
+void ares_run_frame_ports(AresHandle* h) {
+  h->debugReads[0] = h->debugReads[1] = 0;
+  h->debugSeen[0] = h->debugSeen[1] = 0;
+  h->runUntilFrame();
+  h->frames++;
+}
+
+uint32_t ares_debug_port_reads(const AresHandle* h, uint32_t port, uint32_t* seen) {
+  if(port >= 2) { if(seen) *seen = 0; return 0; }
+  if(seen) *seen = h->debugSeen[port];
+  return h->debugReads[port];
 }
 
 void ares_free(void* p) { std::free(p); }

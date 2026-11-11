@@ -1,5 +1,42 @@
 # HANDOFF: Duo Emulator ("Foldback")
 
+## Update, 11 Nov 2026 (phase 3: controls and controllers)
+Build 1 (b97a765) went to TestFlight via the coordinator. Since then:
+- **Research:** `docs/controls-research.md` (Delta, RetroArch, Provenance, Gamma, Folium, PPSSPP, Lemuroid,
+  Android single-system apps, Manic EMU; praise/complaints; "How we beat them").
+- **Layout editor** (pause menu › Edit controls): drag, pinch or slider to resize, per-control opacity,
+  haptic strength, auto-fire and show/hide; snap to an 8 pt grid; presets; scope "All games" or "This game";
+  reset; import/export a `.foldlayout` JSON file; Done saves, Cancel discards everything (reset and import
+  included). Layouts are per system and per area (Duo table, portrait, book left page, book right page,
+  landscape), optionally per game; stored in Application Support/Layouts. Controls are clamped to their
+  area, so nothing can cover the game in table pose. Layout-wide: diagonal width (Off/Narrow/Normal/Wide),
+  auto-fire rate (5-30/s), overall haptics. VoiceOver can move/resize with actions.
+- **6-Button Arcade preset** (SNES: Y X L over B A R; Mega Drive: X Y Z over A B C), two arched, staggered
+  rows plus a "x3" zone per row (hideable). Two-button systems get an A+B zone between the buttons.
+- **Physical controllers:** hot-plug toast; the touch controller hides while a pad plays ("Keep touch controls
+  visible" in Controllers); Duo table pose shows a companion on the bottom screen (save slots, rewind / fast-
+  forward, menu, hotkey list): chosen over stretching the game across both halves because the hinge would cut
+  the picture. Book: game takes the whole left page, companion on the right (the hinge never crosses the
+  picture; full-canvas would). Portrait: bigger screen + compact companion. Landscape iPhone/iPad: edge-to-edge,
+  integer-scaled when the screen mode is Auto, with a small corner menu key.
+- **Mapping** (pause menu › Controllers): per-system controller and keyboard remapping (press-to-assign),
+  hotkey combos (defaults: Home or Options+Menu = menu, Options+L1/R1 = load/save slot 1, Options+L2/R2 or
+  L2/R2 alone = rewind/fast-forward), left stick as D-pad with a dead-zone slider, player assignment for a
+  second pad on NES / SNES / Mega Drive (cores now have a second port), rumble on save/load where supported.
+  A modifier that is also a button (Options = Select) waits 180 ms so combos never leak a Select press; a quick
+  tap still sends Select.
+- **Tests:** CoreKit 76 (incl. mapping engine and player-2), app unit 15 (layouts, store, import clamping,
+  D-pad maths, controller path driven without hardware), UI 23 (editor drag-and-persist, arcade presets,
+  controllers screen, controller layouts via `-fakeController YES`). All pass in the simulator.
+- **Needs Gordon's device test:** a real Bluetooth / MFi pad (the simulator can't pair one: everything pad-side
+  is unit-tested or faked), whether iOS passes the Home button to the app, controller rumble, touch haptics
+  strength, thumb reach of the default and arcade layouts on the Duo.
+- **Fable review:** PASS WITH FIXES, all 6 applied (settings/frames clamped on load and import; second pad
+  gets player 2 at launch; landscape menu key + Options+Menu combo; no Select leak; Cancel really cancels and
+  per-control hide makes the multi-press zones optional; keyboard/pad disconnect clears held keys and capture).
+
+---
+
 ## Update, 11 Nov 2026 (second phase, after Gordon approved the downloads)
 - **Systems that play (simulator + Mac tests):** NES and Game Boy / Color (in-house), Game Boy Advance (mGBA,
   HLE BIOS), SNES and Mega Drive (ares). Master System / Game Gear / PC Engine were not attempted.
