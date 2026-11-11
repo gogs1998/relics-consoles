@@ -82,9 +82,10 @@ Fable review changes in §10) and `docs/research.md` (App Store 4.7, core licens
   `LayoutEditor` + `LayoutEditorArea` + `LayoutEditorPanel`; `GamepadHub` (GameController + keyboard, players,
   hotkeys via CoreKit `InputMapper`, remap capture), `ControllersSheet`, `ControllerCompanion`.
 
-## Review policy (Gordon, 11 Nov 2026)
-- No Fable reviews for routine emulator work (cost). Fable review only for new third-party core code or anything
-  that could copy real firmware or ROM bytes (IP risk).
+## Review policy (Gordon, 11 Nov 2026: "keep fable use, be wary about cost though")
+- One tightly briefed Fable review per meaningful batch of work: give it the diff and the risks, not the repo.
+- Always review third-party code, licences and anything firmware/ROM-adjacent. Skip trivial changes.
+- Re-check only after a serious must-fix.
 
 ## Conventions
 - Dynamic Type text styles only (`Font.rounded(_:weight:)`), never fixed point sizes for text.
