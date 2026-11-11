@@ -82,6 +82,10 @@ Fable review changes in §10) and `docs/research.md` (App Store 4.7, core licens
   `LayoutEditor` + `LayoutEditorArea` + `LayoutEditorPanel`; `GamepadHub` (GameController + keyboard, players,
   hotkeys via CoreKit `InputMapper`, remap capture), `ControllersSheet`, `ControllerCompanion`.
 
+## Review policy (Gordon, 11 Nov 2026)
+- No Fable reviews for routine emulator work (cost). Fable review only for new third-party core code or anything
+  that could copy real firmware or ROM bytes (IP risk).
+
 ## Conventions
 - Dynamic Type text styles only (`Font.rounded(_:weight:)`), never fixed point sizes for text.
 - Zero warnings (the `appintentsmetadataprocessor` "Metadata extraction skipped" line is a tool message).
