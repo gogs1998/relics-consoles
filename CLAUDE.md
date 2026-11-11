@@ -1,7 +1,7 @@
 # CLAUDE.md: Duo Emulator (working title "Foldback")
 
 A Duo-first multi-system retro game emulator for the iPhone Duo, also for ordinary iPhone and iPad.
-Players load games they own through the Files picker; nothing is bundled or downloaded. Read
+Players load games they own through the Files picker; nothing is downloaded. Freely licensed homebrew demos may be bundled (`docs/homebrew-candidates.md`). Read
 `HANDOFF.md` (state, what's verified, decisions pending), `docs/design.md` (approved design, with the
 Fable review changes in §10) and `docs/research.md` (App Store 4.7, core licensing, wish lists) first.
 
@@ -9,11 +9,20 @@ Fable review changes in §10) and `docs/research.md` (App Store 4.7, core licens
 - **Never** download, bundle, generate or point to commercial ROMs or BIOS files. Test only with our
   own ROMs (`TestROMs/`, built by our own assemblers). Third-party test suites, homebrew and emulator
   cores need Gordon's approval first (lists in `docs/research.md` §6 and `HANDOFF.md`).
-- No GPL or non-commercial code in the binary (research §2). NES and GB/GBC cores are ours; GBA is mGBA
+- **Licence (Gordon, 11 Nov 2026): the app is going GPLv3 open source** so GPL cores can be used, like Delta
+  ("easy way, we're not reinventing the wheel"). Every component must be GPLv3-compatible. **Still banned:**
+  non-commercial / no-derivatives licences (Snes9x, Genesis Plus GX, FinalBurn's NC parts, DuckStation's newer
+  CC BY-NC-ND releases) and anything unlicensed. Public source repo is approved but create it only when a
+  build is about to ship publicly (ask Gordon once more at that point). Each new core gets a Fable licence review.
+  NES and GB/GBC cores are ours; GBA is mGBA
   (MPL-2.0, vendored unmodified in `Packages/CoreKit/Sources/MGBA/mgba`, any change must go in
   `ThirdParty/mgba/patches/` and be published); SNES and Mega Drive are ares (ISC, vendored unmodified in
   `Sources/ARES/ares`, our stand-ins in `glue/shim`). Licence texts: `Licenses/` (repo) and
   `App/Resources/Licences/` (shown in About). Keep both in sync when a component is added.
+- **Core plan:** N64 (mupen64plus + GLideN64 + rsp-hle) and DS (melonDS, own FreeBIOS) first, then PS1
+  (PCSX-ReARMed, HLE BIOS), PSP (PPSSPP, no JIT), then small systems (Mednafen, Stella). GameCube/Wii is a
+  post-v1 goal (`docs/gamecube-wii-feasibility.md`). Upstream sources are cloned into `ThirdParty-src/` (gitignored).
+  Systems needing a BIOS must use an HLE/free replacement; never ship or point to Nintendo/Sony firmware.
 - No JIT, ever (no sljit/recompilers). No firmware: SNES DSP-n/ST01x/Cx4 games are refused; the SPC700
   boot program is our own (`kBootProgram` in `ares_glue.cpp`, rewritten from the protocol after a review).
 - No console logos, trade dress, silhouettes, console colour schemes or real system fonts. No console
