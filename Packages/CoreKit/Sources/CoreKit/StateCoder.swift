@@ -21,6 +21,9 @@ public struct StateCoder {
 
     public var isReading: Bool { mode == .read }
 
+    /// Bytes left to read (for an optional trailing section older states don't have).
+    public var remaining: Int { mode == .read ? data.count - pos : 0 }
+
     private mutating func take(_ n: Int) -> Int? {
         guard failed == nil else { return nil }
         guard pos + n <= data.count else { failed = "state ends early"; return nil }

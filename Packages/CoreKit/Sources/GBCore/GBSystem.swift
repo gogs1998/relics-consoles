@@ -179,9 +179,8 @@ public final class GBSystem: EmulatorCore {
         while !ppu.frameComplete && cycles &- start < limit {
             step()
         }
-        // The MBC3 clock runs from its own crystal: count real time, not CPU speed.
-        let m = Int(cycles &- start)
-        cart.tickRTC(units: doubleSpeed ? m : m * 2)
+        // The MBC3 clock runs from its own crystal: it keeps real (wall-clock) time.
+        cart.tickRTC()
     }
 
     public func drainAudio(into ring: AudioRing) {
@@ -233,6 +232,7 @@ public final class GBSystem: EmulatorCore {
         cart.sync(&st)
         ppu.sync(&st)
         apu.sync(&st)
+        cart.syncRTCWallTime(&st)   // last, and optional on read: older states don't have it
         if st.isReading {
             refreshDerived()
             apu.decimator.setInputRate(1_048_576)

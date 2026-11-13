@@ -33,9 +33,14 @@ final class Cartridge {
     var latchPrev: UInt8 = 0xFF
     var rtc = [UInt8](repeating: 0, count: 5)
     var rtcLatched = [UInt8](repeating: 0, count: 5)
-    /// Sub-second progress of the MBC3 clock, in half-M-cycles at normal speed (2,097,152 a second).
+    /// Sub-second progress of the MBC3 clock, in microseconds.
     var rtcSub = 0
-    static let rtcUnitsPerSecond = 2_097_152
+    static let rtcUnitsPerSecond = 1_000_000
+    /// The clock's time source (seconds since 1970). The MBC3 crystal keeps real time whatever the
+    /// emulator does (paused, fast-forward, rewind), so the clock follows the wall clock.
+    var wallClock: () -> Double = { Date().timeIntervalSince1970 }
+    /// When the clock last caught up with `wallClock`.
+    var rtcLastWall: Double = 0
 
     init(rom data: Data) throws {
         guard data.count >= 0x150 else { throw CoreError.corruptFile("too short for a Game Boy cartridge") }
@@ -94,6 +99,7 @@ final class Cartridge {
         ram = .allocate(capacity: max(ramSize, 1))
         ram.initialize(repeating: 0xFF, count: max(ramSize, 1))
         crc = CRC32.checksum(data)
+        rtcLastWall = wallClock()
         reset()
     }
 
@@ -113,7 +119,8 @@ final class Cartridge {
         update()
     }
 
-    func loadBattery(_ data: Data, now: Date = Date()) {
+    func loadBattery(_ data: Data, now: Date? = nil) {
+        let now = now ?? Date(timeIntervalSince1970: wallClock())
         let n = min(data.count, ramSize)
         if n > 0 {
             data.withUnsafeBytes { raw in ram.update(from: raw.bindMemory(to: UInt8.self).baseAddress!, count: n) }
@@ -128,11 +135,18 @@ final class Cartridge {
         var stamp: UInt64 = 0
         for i in 0..<(footer - 40) { stamp |= UInt64(b[40 + i]) << (8 * UInt64(i)) }
         let elapsed = Int(now.timeIntervalSince1970) - Int(stamp)
-        if stamp > 0, elapsed > 0 { advanceRTC(seconds: min(elapsed, 10 * 365 * 86_400)) }
+        if stamp > 0, elapsed > 0 { advanceRTC(seconds: min(elapsed, Self.maxCatchUp)) }
+        rtcLastWall = now.timeIntervalSince1970
     }
 
-    /// Battery contents: RAM, plus the RTC footer for clock cartridges.
-    func batteryData(now: Date = Date()) -> Data? {
+    /// Longest stretch of real time the clock catches up in one go (ten years).
+    static let maxCatchUp = 10 * 365 * 86_400
+
+    /// Battery contents: RAM, plus the RTC footer for clock cartridges (the format VBA-M, BGB and
+    /// mGBA share: 5 registers then 5 latched registers as 32-bit little-endian words, then the
+    /// 64-bit little-endian Unix time of the save).
+    func batteryData(now: Date? = nil) -> Data? {
+        let now = now ?? Date(timeIntervalSince1970: wallClock())
         guard hasBattery else { return nil }
         var d = ramSize > 0 ? Data(bytes: ram, count: ramSize) : Data()
         if hasRTC {
@@ -143,14 +157,48 @@ final class Cartridge {
         return d.isEmpty ? nil : d
     }
 
-    /// Advances the clock by emulated time (called once per frame).
-    func tickRTC(units: Int) {
-        guard hasRTC, (rtc[4] & 0x40) == 0 else { return }
-        rtcSub += units
+    /// Catches the clock up with real time (called once per frame). Time while halted is lost,
+    /// as on the cartridge; a wall clock set backwards is ignored.
+    func tickRTC() {
+        guard hasRTC else { return }
+        let now = wallClock()
+        let dt = now - rtcLastWall
+        rtcLastWall = now
+        guard dt > 0, dt.isFinite else { return }
+        addRTC(microseconds: Int((min(dt, Double(Self.maxCatchUp)) * 1_000_000).rounded()))
+    }
+
+    func addRTC(microseconds: Int) {
+        guard (rtc[4] & 0x40) == 0, microseconds > 0 else { return }
+        rtcSub += microseconds
         if rtcSub >= Self.rtcUnitsPerSecond {
             let secs = rtcSub / Self.rtcUnitsPerSecond
             rtcSub -= secs * Self.rtcUnitsPerSecond
             advanceRTC(seconds: secs)
+        }
+    }
+
+    /// Save states carry the wall time they were made; loading one catches the clock up by the
+    /// real time since (the cartridge's crystal never stopped). States without it just carry on.
+    func syncRTCWallTime(_ st: inout StateCoder) {
+        guard hasRTC else { return }
+        if st.isReading {
+            let now = wallClock()
+            rtcSub = min(max(rtcSub, 0), Self.rtcUnitsPerSecond - 1)
+            if st.remaining >= 12 {
+                st.section("RTCW")
+                var stamp = 0.0
+                st.sync(&stamp)
+                let elapsed = now - stamp
+                if st.failed == nil, stamp > 0, elapsed > 0, elapsed.isFinite {
+                    addRTC(microseconds: Int((min(elapsed, Double(Self.maxCatchUp)) * 1_000_000).rounded()))
+                }
+            }
+            rtcLastWall = now
+        } else {
+            st.section("RTCW")
+            var stamp = wallClock()
+            st.sync(&stamp)
         }
     }
 
