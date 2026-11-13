@@ -214,6 +214,12 @@ public enum CRC32 {
         return c
     }
 
+    static func `continue`(_ crc: UInt32, _ bytes: UnsafeBufferPointer<UInt8>) -> UInt32 {
+        var c = crc
+        for byte in bytes { c = table[Int((c ^ UInt32(byte)) & 0xFF)] ^ (c >> 8) }
+        return c
+    }
+
     public static func checksum(_ data: Data) -> UInt32 {
         var c: UInt32 = 0xFFFFFFFF
         data.withUnsafeBytes { raw in

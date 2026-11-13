@@ -38,12 +38,14 @@ enum ImportError: LocalizedError {
     case notAGame(String)
     case unreadable(String)
     case notInThisVersion(String, SystemID)
+    case zip(String, String)
 
     var errorDescription: String? {
         switch self {
         case .notAGame(let name): "\(name) isn't a game file this app can play (NES, SNES, Game Boy, Game Boy Color, Game Boy Advance, Mega Drive or Nintendo DS)."
         case .unreadable(let name): "\(name) couldn't be read."
         case .notInThisVersion(let name, let system): "\(name) is a \(system.displayName) game. \(system.displayName) isn't available in this version yet."
+        case .zip(let name, let reason): "\(name) \(reason)"
         }
     }
 }
@@ -188,6 +190,7 @@ final class GameStore {
     private func importOne(_ url: URL) throws -> Bool {
         let name = url.lastPathComponent
         guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else { throw ImportError.unreadable(name) }
+        if url.pathExtension.lowercased() == "zip" || ZipArchive.isZip(data) { return try importZip(data, named: name) }
         // Largest real cartridges: 512 MB (DS), 64 MB (N64), 32 MB (GBA), 8 MB (SNES), a few MB for the rest.
         guard data.count >= 16, data.count <= 512 * 1024 * 1024,
               let system = CoreFactory.detect(rom: data, fileExtension: url.pathExtension),
@@ -201,6 +204,23 @@ final class GameStore {
         games.append(GameRecord(id: id, title: Self.title(fromFileName: name), system: system,
                                 fileName: fileName, added: Date()))
         return true
+    }
+
+    /// A zip holding one game imports that game (Apple's Compression inflates it; nothing
+    /// third-party). Extracted to a temporary folder, imported as if picked, then removed.
+    private func importZip(_ data: Data, named name: String) throws -> Bool {
+        do {
+            let extensions = Set(SystemID.allCases.flatMap(\.fileExtensions))
+            let entry = try ZipArchive.gameEntry(in: ZipArchive.entries(data), extensions: extensions)
+            let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: dir) }
+            let file = dir.appendingPathComponent(entry.fileName)
+            try ZipArchive.extract(entry, from: data, to: file)
+            return try importOne(file)
+        } catch let e as ZipArchive.ZipError {
+            throw ImportError.zip(name, e.errorDescription ?? "couldn't be opened.")
+        }
     }
 
     private static func gameID(_ data: Data) -> String {

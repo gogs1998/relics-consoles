@@ -67,7 +67,7 @@ struct LibraryView: View {
         var exts = ["nes", "gb", "gbc", "gba", "sfc", "smc", "md", "gen", "smd", "nds"]
         if SystemID.n64.isAvailableInThisBuild { exts += ["z64", "n64", "v64"] }
         let ids = exts.map { "com.iqlabs.duoemulator.\($0)" }
-        return ids.compactMap { UTType($0) } + [.data]
+        return ids.compactMap { UTType($0) } + [.zip, .data]
     }
 
     // MARK: shelf
