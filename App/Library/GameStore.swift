@@ -187,10 +187,13 @@ final class GameStore {
         return added
     }
 
-    private func importOne(_ url: URL) throws -> Bool {
+    private func importOne(_ url: URL, allowZip: Bool = true) throws -> Bool {
         let name = url.lastPathComponent
         guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else { throw ImportError.unreadable(name) }
-        if url.pathExtension.lowercased() == "zip" || ZipArchive.isZip(data) { return try importZip(data, named: name) }
+        if url.pathExtension.lowercased() == "zip" || ZipArchive.isZip(data) {
+            guard allowZip else { throw ImportError.notAGame(name) }   // no zips inside zips
+            return try importZip(data, named: name)
+        }
         // Largest real cartridges: 512 MB (DS), 64 MB (N64), 32 MB (GBA), 8 MB (SNES), a few MB for the rest.
         guard data.count >= 16, data.count <= 512 * 1024 * 1024,
               let system = CoreFactory.detect(rom: data, fileExtension: url.pathExtension),
@@ -217,7 +220,7 @@ final class GameStore {
             defer { try? FileManager.default.removeItem(at: dir) }
             let file = dir.appendingPathComponent(entry.fileName)
             try ZipArchive.extract(entry, from: data, to: file)
-            return try importOne(file)
+            return try importOne(file, allowZip: false)
         } catch let e as ZipArchive.ZipError {
             throw ImportError.zip(name, e.errorDescription ?? "couldn't be opened.")
         }

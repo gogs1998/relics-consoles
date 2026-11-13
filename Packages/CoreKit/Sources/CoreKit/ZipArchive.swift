@@ -116,7 +116,7 @@ public enum ZipArchive {
         }
         var crc = CRC32.Running()
         var written = 0
-        let source = b.subdata(in: (b.startIndex + start)..<(b.startIndex + start + e.compressedSize))
+        let source = b[(b.startIndex + start)..<(b.startIndex + start + e.compressedSize)]   // no copy
         func emit(_ chunk: UnsafeBufferPointer<UInt8>) throws {
             written += chunk.count
             guard written <= e.uncompressedSize else { throw ZipError.damaged("more data than it says") }

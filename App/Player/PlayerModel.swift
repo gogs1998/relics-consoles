@@ -121,6 +121,8 @@ final class PlayerModel {
                 self?.players = players
                 self?.gamepads.players = players
                 self?.started = true
+                // The lid closed or the app left while the core was starting: stay asleep.
+                if self?.sleepReasons.isEmpty == false { self?.pause() }
                 if autoResume && self?.settings.autoSave == true { self?.resumeAutoState() }
             }
         }
@@ -300,10 +302,12 @@ final class PlayerModel {
             let c = try StateContainer.decode(data)
             guard c.system == game.system, c.romCRC == romCRC || romCRC == 0 else {
                 show("That state belongs to a different game")
+                undoState = nil
                 return
             }
             guard c.coreStateVersion == stateVersion else {
                 show("That state was made by an older version of the app")
+                undoState = nil
                 return
             }
             session.send(.loadState(c.payload) { [weak self] error in
@@ -320,7 +324,14 @@ final class PlayerModel {
     }
 
     private func writeAutoState(completion: (@MainActor @Sendable () -> Void)? = nil) {
-        guard started, errorMessage == nil, settings.autoSave else {
+        guard started, errorMessage == nil else {
+            completion?()
+            return
+        }
+        guard settings.autoSave else {
+            // An old auto-state would carry old in-game save memory: never let it come back later
+            // (turning auto-save on again) and roll the battery save back.
+            try? FileManager.default.removeItem(at: store.stateURL(for: game, slot: 0))
             completion?()
             return
         }
@@ -438,7 +449,7 @@ final class PlayerModel {
         toastTask?.cancel()
         toastTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(undo ? 4 : 2.2))
-            if !Task.isCancelled { self?.toast = nil; self?.toastOffersUndo = false }
+            if !Task.isCancelled { self?.toast = nil; self?.toastOffersUndo = false; self?.undoState = nil }
         }
     }
 }
@@ -451,8 +462,10 @@ final class BackgroundSave {
 
     init(waitingFor count: Int) {
         outstanding = count
-        task = UIApplication.shared.beginBackgroundTask(withName: "Auto-save") { [weak self] in
-            MainActor.assumeIsolated { self?.end() }
+        // Strong on purpose: the tracker lives until the saves finish or the time runs out, so the
+        // task is always ended even if a reply never comes.
+        task = UIApplication.shared.beginBackgroundTask(withName: "Auto-save") {
+            MainActor.assumeIsolated { self.end() }
         }
     }
 

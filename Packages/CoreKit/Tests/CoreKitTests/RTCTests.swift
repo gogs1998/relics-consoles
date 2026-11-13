@@ -122,4 +122,23 @@ import Testing
         e.loadBattery(d.prefix(d.count - 4), now: Date(timeIntervalSince1970: 0x0102_0304 + 61))
         #expect(e.rtc[0] == 8 && e.rtc[1] == 9 && e.rtcLatched[0] == 1)
     }
+
+    /// Fable review: time paused after the last frame must not vanish when a state or the battery
+    /// is written during the pause (both are stamped with the registers' own moment).
+    @Test func timePausedBeforeASaveIsKept() throws {
+        let gb = try GBSystem(rom: clockROM(), battery: nil)
+        let clock = FakeClock()
+        gb.cart.wallClock = { clock.now }
+        gb.cart.rtcLastWall = clock.now
+        gb.runFrame(input: [])
+        clock.now += 600                     // ten minutes in the pause menu, no frames
+        let state = gb.saveState()
+        let battery = try #require(gb.batteryRAM)
+        try gb.loadState(state)
+        #expect(gb.cart.rtc[1] == 10)
+        let fresh = try GBSystem(rom: clockROM(), battery: nil)
+        fresh.cart.wallClock = { clock.now }
+        fresh.cart.loadBattery(battery)
+        #expect(fresh.cart.rtc[1] == 10)
+    }
 }

@@ -61,7 +61,7 @@ struct PlayerView: View {
             if closed { model.sleep(.lidClosed) } else { model.wake(.lidClosed) }
         }
         .overlay {
-            if model.isAsleepWithLidClosed { SleepVeil().transition(.opacity) }
+            if model.isAsleepWithLidClosed { SleepVeil(autoSaved: model.settings.autoSave).transition(.opacity) }
         }
         .animation(.easeInOut(duration: 0.3), value: model.isAsleepWithLidClosed)
         #if DEBUG
@@ -476,6 +476,7 @@ extension View {
 
 /// Shown while the lid is closed: the game is paused and saved.
 struct SleepVeil: View {
+    var autoSaved = true
     var body: some View {
         ZStack {
             Color.black.opacity(0.78)
@@ -486,7 +487,7 @@ struct SleepVeil: View {
                 Text("Sleeping")
                     .font(.rounded(.title3, weight: .heavy))
                     .foregroundStyle(Theme.ink)
-                Text("Saved. Open to carry on where you left off.")
+                Text(autoSaved ? "Saved. Open to carry on where you left off." : "Paused. Open to carry on where you left off.")
                     .font(.rounded(.footnote))
                     .foregroundStyle(Theme.inkDim)
                     .multilineTextAlignment(.center)

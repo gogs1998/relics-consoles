@@ -134,8 +134,8 @@ final class Cartridge {
         for i in 0..<5 { rtc[i] = word(i); rtcLatched[i] = word(5 + i) }
         var stamp: UInt64 = 0
         for i in 0..<(footer - 40) { stamp |= UInt64(b[40 + i]) << (8 * UInt64(i)) }
-        let elapsed = Int(now.timeIntervalSince1970) - Int(stamp)
-        if stamp > 0, elapsed > 0 { advanceRTC(seconds: min(elapsed, Self.maxCatchUp)) }
+        let elapsed = Int64(now.timeIntervalSince1970) - Int64(truncatingIfNeeded: stamp)
+        if Int64(truncatingIfNeeded: stamp) > 0, elapsed > 0 { advanceRTC(seconds: Int(min(elapsed, Int64(Self.maxCatchUp)))) }
         rtcLastWall = now.timeIntervalSince1970
     }
 
@@ -146,7 +146,9 @@ final class Cartridge {
     /// mGBA share: 5 registers then 5 latched registers as 32-bit little-endian words, then the
     /// 64-bit little-endian Unix time of the save).
     func batteryData(now: Date? = nil) -> Data? {
-        let now = now ?? Date(timeIntervalSince1970: wallClock())
+        // Stamped with the moment the registers are true for (the last frame run), so time spent
+        // paused after it is caught up on the next load rather than lost.
+        let now = now ?? Date(timeIntervalSince1970: hasRTC ? rtcLastWall : wallClock())
         guard hasBattery else { return nil }
         var d = ramSize > 0 ? Data(bytes: ram, count: ramSize) : Data()
         if hasRTC {
@@ -197,7 +199,7 @@ final class Cartridge {
             rtcLastWall = now
         } else {
             st.section("RTCW")
-            var stamp = wallClock()
+            var stamp = rtcLastWall   // the moment the registers are true for
             st.sync(&stamp)
         }
     }
