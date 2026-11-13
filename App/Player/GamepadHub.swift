@@ -363,7 +363,11 @@ final class GamepadHub {
     // MARK: haptics
 
     /// A short, crisp pulse on every connected controller that supports haptics.
+    /// Off when Settings turns haptics off.
+    var rumbleEnabled = true
+
     func pulse(intensity: Float = 0.7) {
+        guard rumbleEnabled else { return }
         for (id, pad) in controllers {
             guard let haptics = pad.haptics else { continue }
             let engine = hapticEngines[id] ?? haptics.createEngine(withLocality: .default)

@@ -58,6 +58,12 @@ struct PlayerMenu: View {
                 } label: { Label("Controllers", systemImage: "gamecontroller") }
                     .buttonStyle(ChipStyle(selected: false))
                     .accessibilityIdentifier("menu.controllers")
+                Button {
+                    model.showingSettings = true
+                    model.menuOpen = false
+                } label: { Label("Settings", systemImage: "gearshape") }
+                    .buttonStyle(ChipStyle(selected: false))
+                    .accessibilityIdentifier("menu.settings")
             }
             HStack(spacing: 8) {
                 Button { model.reset() } label: { Label("Reset", systemImage: "arrow.counterclockwise") }

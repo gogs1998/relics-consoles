@@ -18,6 +18,8 @@ final class PlayerModel {
     var editor: LayoutEditor?
     /// The controller-remapping sheet.
     var showingControllers = false
+    /// The Settings sheet, opened from the pause menu (the game stays paused).
+    var showingSettings = false
     /// Keep the on-screen controller visible even with a physical controller connected.
     var keepTouchControls = UserDefaults.standard.bool(forKey: "keepTouchControls") {
         didSet { UserDefaults.standard.set(keepTouchControls, forKey: "keepTouchControls") }
@@ -31,7 +33,7 @@ final class PlayerModel {
     private(set) var started = false
     var menuOpen = false {
         didSet {
-            if menuOpen { pause() } else if editor == nil && !showingControllers { resume() }
+            if menuOpen { pause() } else if editor == nil && !showingControllers && !showingSettings { resume() }
         }
     }
     private(set) var fastForward = false
@@ -76,11 +78,26 @@ final class PlayerModel {
         lastBattery = battery
         session = EmulatorSession(system: game.system, rom: rom, battery: battery)
         let saved = UserDefaults.standard.string(forKey: "screenMode.\(game.system.rawValue)")
-        screenMode = saved.flatMap(ScreenMode.init(rawValue:)) ?? .auto
+        screenMode = saved.flatMap(ScreenMode.init(rawValue:)) ?? AppSettings.shared.screenMode
     }
 
 
+    @ObservationIgnored let settings = AppSettings.shared
+
+    /// Applies the Settings screen live (haptics, volume) and keeps following it.
+    private func followSettings() {
+        withObservationTracking {
+            controller.hapticsEnabled = settings.haptics
+            gamepads.rumbleEnabled = settings.haptics
+            audio.volume = Float(settings.volume)
+            if fastForward { session.send(.speed(settings.fastForwardSpeed)) }
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.followSettings() }
+        }
+    }
+
     func start(resume autoResume: Bool) {
+        followSettings()
         controller.latch = session.input
         controller.onMenu = { [weak self] in self?.menuOpen = true }
         controller.onFastForward = { [weak self] on in self?.setFastForward(on) }
@@ -104,7 +121,7 @@ final class PlayerModel {
                 self?.players = players
                 self?.gamepads.players = players
                 self?.started = true
-                if autoResume { self?.resumeAutoState() }
+                if autoResume && self?.settings.autoSave == true { self?.resumeAutoState() }
             }
         }
         session.onVideoSize = { [weak self] w, h in
@@ -212,7 +229,7 @@ final class PlayerModel {
         guard sleepReasons.remove(reason) != nil else { return }
         guard sleepReasons.isEmpty else { return }
         Self.log.info("wake (\(String(describing: reason)))")
-        if !menuOpen && editor == nil && !showingControllers { resume() }
+        if !menuOpen && editor == nil && !showingControllers && !showingSettings { resume() }
     }
 
     nonisolated static let log = Logger(subsystem: "com.iqlabs.duoemulator", category: "player")
@@ -225,7 +242,7 @@ final class PlayerModel {
 
     func setFastForward(_ on: Bool) {
         fastForward = on
-        session.send(.speed(on ? 3 : 1))
+        session.send(.speed(on ? settings.fastForwardSpeed : 1))
     }
 
     func setRewind(_ on: Bool) {
@@ -303,7 +320,7 @@ final class PlayerModel {
     }
 
     private func writeAutoState(completion: (@MainActor @Sendable () -> Void)? = nil) {
-        guard started, errorMessage == nil else {
+        guard started, errorMessage == nil, settings.autoSave else {
             completion?()
             return
         }
@@ -344,6 +361,11 @@ final class PlayerModel {
     func endEditingControls() {
         editor = nil
         resume()
+    }
+
+    func closeSettings() {
+        showingSettings = false
+        if !menuOpen && editor == nil && !showingControllers { resume() }
     }
 
     func closeControllers() {

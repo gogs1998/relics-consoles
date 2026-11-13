@@ -77,6 +77,9 @@ struct PlayerView: View {
         .sheet(isPresented: Binding(get: { model.showingControllers }, set: { if !$0 { model.closeControllers() } })) {
             ControllersSheet(model: model)
         }
+        .sheet(isPresented: Binding(get: { model.showingSettings }, set: { if !$0 { model.closeSettings() } })) {
+            SettingsView()
+        }
         #if DEBUG
         .overlay(alignment: .topLeading) {
             Text("audio \(model.audioStats)")

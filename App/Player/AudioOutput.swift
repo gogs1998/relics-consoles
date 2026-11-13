@@ -12,6 +12,10 @@ final class AudioOutput {
     private var generation = 0
     private var ring: AudioRing?
     private var observers: [NSObjectProtocol] = []
+    /// Game volume (Settings), 0...1.
+    var volume: Float = 0.9 {
+        didSet { engine.mainMixerNode.outputVolume = volume }
+    }
     nonisolated static let log = Logger(subsystem: "com.iqlabs.duoemulator", category: "audio")
 
     /// Built outside any actor: a closure written in a @MainActor method inherits main-actor
@@ -61,7 +65,7 @@ final class AudioOutput {
         self.node = node
         engine.attach(node)
         engine.connect(node, to: engine.mainMixerNode, format: format)
-        engine.mainMixerNode.outputVolume = 0.9
+        engine.mainMixerNode.outputVolume = volume
         do {
             try engine.start()
             isRunning = true

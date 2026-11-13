@@ -11,6 +11,7 @@ struct LibraryView: View {
 
     @State private var importing = false
     @State private var showingAbout = false
+    @State private var showingSettings = false
     @State private var selected: GameRecord.ID?
     @State private var renaming: GameRecord?
     @State private var newTitle = ""
@@ -38,6 +39,7 @@ struct LibraryView: View {
         }
         .frame(width: stage.bounds.width, height: stage.bounds.height)
         .sheet(isPresented: $showingAbout) { AboutView() }
+        .sheet(isPresented: $showingSettings) { SettingsView() }
         .fileImporter(isPresented: $importing, allowedContentTypes: Self.importTypes, allowsMultipleSelection: true) { result in
             if case .success(let urls) = result { store.importFiles(urls) }
         }
@@ -125,6 +127,11 @@ struct LibraryView: View {
                 }
             }
             Spacer()
+            Button { showingSettings = true } label: {
+                Image(systemName: "gearshape").font(.rounded(.title3)).foregroundStyle(Theme.inkDim)
+            }
+            .accessibilityLabel("Settings")
+            .accessibilityIdentifier("library.settings")
             Button { showingAbout = true } label: {
                 Image(systemName: "info.circle").font(.rounded(.title3)).foregroundStyle(Theme.inkDim)
             }
