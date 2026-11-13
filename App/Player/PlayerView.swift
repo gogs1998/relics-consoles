@@ -280,8 +280,10 @@ struct PlayerView: View {
                           layout: ((CGSize, LayoutPreset) -> [Control])? = nil) -> some View {
         let system = model.game.system, six = model.sixButtonPad, size = rect.size
         return ZStack(alignment: .topLeading) {
-            VentSlots(columns: 5)
-                .position(x: rect.width * 0.86, y: rect.height * 0.88)
+            if system != .n64 {   // the N64 deck uses that corner for the C buttons
+                VentSlots(columns: 5)
+                    .position(x: rect.width * 0.86, y: rect.height * 0.88)
+            }
             controllerArea(area, rect: CGRect(origin: .zero, size: size), avoiding: avoiding) {
                 layout?(size, $0) ?? ControllerLayout.deck(size, system: system, sixButton: six, preset: $0)
             }
@@ -300,7 +302,10 @@ struct PlayerView: View {
                 .place(rect)
         } else {
             let r = model.layouts.controls(model.game.system, area, game: model.game.id, size: rect.size, defaults: defaults)
-            ControllerView(controls: r.controls, model: model.controller, settings: r.settings, floating: area == .landscape)
+            let controls = model.game.system == .n64
+                ? N64Layout.camera(r.controls, cStick: model.layouts.options(.n64, game: model.game.id).cStick ?? false)
+                : r.controls
+            ControllerView(controls: controls, model: model.controller, settings: r.settings, floating: area == .landscape)
                 .place(rect)
         }
     }

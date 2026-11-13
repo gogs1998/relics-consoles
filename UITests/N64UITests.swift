@@ -42,9 +42,12 @@ final class N64UITests: XCTestCase {
         XCTAssertTrue(game.waitForExistence(timeout: 8), "\(name): no game screen")
         var seen = 0
         for label in ["Analog stick", "Direction pad", "A button", "B button", "C up button", "C down button",
-                      "C left button", "C right button", "Z shoulder button", "L shoulder button", "R shoulder button",
+                      "C left button", "C right button", "Z", "L shoulder button", "R shoulder button",
                       "Start"] {
-            let e = element(app, label: label)
+            // Z is a face button on the deck, a shoulder elsewhere
+            let e = label == "Z" ? (element(app, label: "Z button").exists ? element(app, label: "Z button")
+                                                                            : element(app, label: "Z shoulder button"))
+                                 : element(app, label: label)
             guard e.exists else { continue }
             seen += 1
             XCTAssertFalse(e.frame.intersects(game.frame.insetBy(dx: 1, dy: 1)), "\(name): \(label) covers the game")
@@ -99,6 +102,65 @@ final class N64UITests: XCTestCase {
         XCTAssertTrue(element(app, label: "Analog stick").waitForExistence(timeout: 10))
         sleep(3)
         save("book-n64")
+    }
+
+    // MARK: C stick (camera option)
+
+    @MainActor
+    private func checkCStick(_ app: XCUIApplication, _ name: String) {
+        let c = element(app, label: "C stick")
+        XCTAssertTrue(c.waitForExistence(timeout: 10), "\(name): no C stick")
+        sleep(2)
+        XCTAssertFalse(element(app, label: "C up button").exists, "\(name): C buttons shown with the C stick")
+        let game = app.descendants(matching: .any)["game.screen"]
+        XCTAssertFalse(c.frame.intersects(game.frame.insetBy(dx: 1, dy: 1)), "\(name): the C stick covers the game")
+        // Pushing it is checked in the app (CStickMath unit tests, and by hand: the arrows light and
+        // the C bits reach the latch). XCUITest's read of the hidden debug readout stays stale after a
+        // drag on this control, so it isn't asserted here.
+    }
+
+    @MainActor func testCStickPortrait() {
+        let app = launch(["-pose", "flat", "-duoAspect", "NO", "-n64CStick", "YES"])
+        checkCStick(app, "portrait")
+        save("iphone-n64-cstick")
+    }
+
+    @MainActor func testCStickTable() {
+        let app = launch(["-pose", "table", "-n64CStick", "YES"])
+        checkCStick(app, "table")
+        save("table-n64-cstick")
+    }
+
+    @MainActor func testCStickLandscape() {
+        let app = launch(["-pose", "flat", "-duoAspect", "NO", "-n64CStick", "YES"], landscape: true)
+        checkCStick(app, "landscape")
+        save("iphone-landscape-n64-cstick")
+    }
+
+    @MainActor func testCStickBook() {
+        let app = launch(["-pose", "book", "-n64CStick", "YES"], landscape: true)
+        XCTAssertTrue(element(app, label: "C stick").waitForExistence(timeout: 10))
+        sleep(3)
+        save("book-n64-cstick")
+    }
+
+    /// The player's own switch: Menu › Edit controls › Camera: C stick › Done.
+    @MainActor func testEditorCameraChoice() {
+        let app = launch(["-pose", "flat", "-duoAspect", "NO", "-openMenu", "YES"])
+        let edit = app.buttons["menu.editControls"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 10))
+        edit.tap()
+        XCTAssertTrue(app.buttons["edit.done"].waitForExistence(timeout: 5))
+        let stickChoice = app.buttons["C stick"]
+        if !stickChoice.exists { app.swipeUp() }
+        XCTAssertTrue(stickChoice.waitForExistence(timeout: 5), "no camera choice")
+        stickChoice.tap()
+        sleep(1)
+        save("editor-n64-cstick")
+        app.buttons["edit.done"].tap()
+        sleep(1)
+        XCTAssertTrue(element(app, label: "C stick").waitForExistence(timeout: 5))
+        XCTAssertFalse(element(app, label: "C up button").exists)
     }
 
     /// The editor's panel has the stick settings; turning on the outer ring is saved with Done.

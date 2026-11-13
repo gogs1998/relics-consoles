@@ -184,6 +184,14 @@ struct SavedLayout: Codable, Hashable {
     }
 }
 
+/// Choices that belong to a player's controller rather than to one area's arrangement, so every
+/// pose follows them. Saved per system and optionally per game, like layouts.
+struct LayoutOptions: Codable, Hashable {
+    var version = 1
+    /// Nintendo 64 camera: the C buttons as a second stick instead of four buttons. nil = off.
+    var cStick: Bool?
+}
+
 /// A shareable file: every saved layout for one system.
 struct LayoutBundle: Codable {
     var format = "foldback-layout"
@@ -260,7 +268,51 @@ final class LayoutStore {
     }
 
     func hasGameLayout(_ system: SystemID, game: String) -> Bool {
-        ControllerArea.allCases.contains { saved(system, $0, game: game) != nil }
+        ControllerArea.allCases.contains { saved(system, $0, game: game) != nil } || savedOptions(system, game: game) != nil
+    }
+
+    // MARK: options (per system, optionally per game)
+
+    @ObservationIgnored private var optionsCache: [String: LayoutOptions?] = [:]
+
+    private func optionsKey(_ system: SystemID, _ game: String?) -> String {
+        let safeGame = game.map { "-" + $0.filter { $0.isLetter || $0.isNumber || $0 == "-" } } ?? ""
+        return "\(system.rawValue)-options\(safeGame)"
+    }
+
+    func savedOptions(_ system: SystemID, game: String?) -> LayoutOptions? {
+        let k = optionsKey(system, game)
+        if let hit = optionsCache[k] { return hit }
+        let value = (try? Data(contentsOf: url(k))).flatMap { try? JSONDecoder().decode(LayoutOptions.self, from: $0) }
+        optionsCache[k] = value
+        return value
+    }
+
+    /// This game's options, else the system's, else the defaults (C buttons, not the C stick).
+    func options(_ system: SystemID, game: String?) -> LayoutOptions {
+        _ = revision
+        #if DEBUG
+        // -n64CStick YES|NO: force the camera choice (UI tests and screenshots).
+        if system == .n64, UserDefaults.standard.object(forKey: "n64CStick") != nil {
+            return LayoutOptions(cStick: UserDefaults.standard.bool(forKey: "n64CStick"))
+        }
+        #endif
+        if let game, let g = savedOptions(system, game: game) { return g }
+        return savedOptions(system, game: nil) ?? LayoutOptions()
+    }
+
+    func saveOptions(_ options: LayoutOptions, _ system: SystemID, game: String?) {
+        let k = optionsKey(system, game)
+        if let data = try? JSONEncoder().encode(options) { try? data.write(to: url(k), options: .atomic) }
+        optionsCache[k] = options
+        revision += 1
+    }
+
+    func removeOptions(_ system: SystemID, game: String?) {
+        let k = optionsKey(system, game)
+        try? FileManager.default.removeItem(at: url(k))
+        optionsCache[k] = .some(nil)
+        revision += 1
     }
 
     func save(_ layout: SavedLayout) {

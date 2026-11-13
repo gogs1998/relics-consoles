@@ -14,6 +14,11 @@ final class LayoutEditor {
     var scopeGame: Bool
     var preset: LayoutPreset = .standard
     var settings = ControlSettings()
+    /// Nintendo 64 camera: the C stick instead of the four C buttons (every pose; saved per game or
+    /// for all games with the layout).
+    var cStick = false {
+        didSet { if let s = selection, !visible(s.area).contains(where: { $0.id == s.id }) { selection = nil } }
+    }
     var snap = true
     static let grid: CGFloat = 8
 
@@ -34,6 +39,18 @@ final class LayoutEditor {
         self.gameID = gameID
         self.store = store
         scopeGame = store.hasGameLayout(system, game: gameID)
+        cStick = system == .n64 && store.options(system, game: gameID).cStick == true
+    }
+
+    /// The controls an area shows: all of them, except the camera control not in use (N64).
+    func visible(_ area: ControllerArea) -> [Control] {
+        let list = controls[area] ?? []
+        return system == .n64 ? N64Layout.camera(list, cStick: cStick) : list
+    }
+
+    /// N64 areas keep both camera controls, so switching never loses either one's place.
+    private func withCamera(_ list: [Control]) -> [Control] {
+        system == .n64 ? N64Layout.withCStick(list) : list
     }
 
     /// Called by each area's editor view when it appears (and when its size changes).
@@ -50,7 +67,7 @@ final class LayoutEditor {
         }
         sizes[area] = size
         let r = store.controls(system, area, game: gameID, size: size, defaults: make)
-        controls[area] = r.controls
+        controls[area] = withCamera(r.controls)
         if !area.isSecondary {   // book pose / DS table: the areas share one layout's settings; take the main one's
             settings = r.settings
             preset = r.preset
@@ -121,13 +138,14 @@ final class LayoutEditor {
 
     func applyPreset(_ p: LayoutPreset) {
         preset = p
-        for (area, make) in defaults { controls[area] = make(p) }
+        for (area, make) in defaults { controls[area] = withCamera(make(p)) }
         selection = nil
     }
 
     /// Back to the built-in layout (nothing is written until Done; Cancel keeps the old one).
     func reset() {
         settings = ControlSettings()
+        cStick = false
         applyPreset(.standard)
         message = "Back to the standard layout. Done saves it; Cancel keeps the old one"
     }
@@ -175,9 +193,13 @@ final class LayoutEditor {
             store.save(SavedLayout(system: system, area: area, gameID: scopeGame ? gameID : nil, preset: preset,
                                    controls: list.map { $0.toUnit(size) }, settings: settings, areaSize: size))
         }
+        if system == .n64 {
+            store.saveOptions(LayoutOptions(cStick: cStick), system, game: scopeGame ? gameID : nil)
+        }
         // Switching a game back to "all games" removes its own layout so the system's applies.
         if !scopeGame {
             for area in ControllerArea.allCases { store.remove(system, area, game: gameID) }
+            store.removeOptions(system, game: gameID)
         }
     }
 
@@ -200,7 +222,7 @@ final class LayoutEditor {
         var n = 0
         for l in b.layouts.map(\.sanitised) {
             guard let size = sizes[l.area] else { continue }
-            controls[l.area] = l.controls.isEmpty ? defaults[l.area]?(l.preset) ?? [] : l.controls.map { $0.fromUnit(size) }
+            controls[l.area] = withCamera(l.controls.isEmpty ? defaults[l.area]?(l.preset) ?? [] : l.controls.map { $0.fromUnit(size) })
             settings = l.settings
             preset = l.preset
             n += 1
@@ -243,7 +265,7 @@ struct LayoutEditorArea: View {
                 }
                 .allowsHitTesting(false)
             }
-            ForEach(editor.controls[area] ?? []) { c in
+            ForEach(editor.visible(area)) { c in
                 let isSelected = editor.selection?.area == area && editor.selection?.id == c.id
                 ControlArt(control: c, model: model, outerRing: editor.settings.stickOuterRing)
                     .frame(width: c.frame.width, height: c.frame.height)
@@ -309,6 +331,7 @@ struct LayoutEditorArea: View {
         case .fastForward: "fast-forward key"
         case .rewind: "rewind key"
         case .stick: "analog stick"
+        case .cStick: "C stick"
         }
     }
 }
@@ -446,7 +469,7 @@ struct LayoutEditorPanel: View {
                 Text("Show this control").font(.rounded(.footnote, weight: .semibold)).foregroundStyle(Theme.ink)
             }
             .tint(Theme.ember)
-            if !c.buttons.isEmpty, !c.buttons.contains(.start) {
+            if !c.buttons.isEmpty, !c.buttons.contains(.start), c.kind != .cStick {
                 Toggle(isOn: Binding(get: { c.autoFire }, set: { editor.setAutoFire($0) })) {
                     Text("Auto-fire while held").font(.rounded(.footnote, weight: .semibold)).foregroundStyle(Theme.ink)
                 }
@@ -482,8 +505,29 @@ struct LayoutEditorPanel: View {
                 .pickerStyle(.segmented)
             }
             slider("Haptics (all)", value: Binding(get: { editor.settings.hapticLevel }, set: { editor.settings.hapticLevel = $0 }), range: 0...1)
-            if editor.system == .n64 { stickSettings }
+            if editor.system == .n64 {
+                cameraPicker
+                stickSettings
+            }
         }
+    }
+
+    /// Nintendo 64 camera: the four C buttons, or the same buttons as a second stick on the right.
+    private var cameraPicker: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Camera").font(.rounded(.footnote, weight: .semibold)).foregroundStyle(Theme.ink)
+                Picker("Camera", selection: Binding(get: { editor.cStick }, set: { editor.cStick = $0 })) {
+                    Text("C buttons").tag(false)
+                    Text("C stick").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("edit.camera")
+            }
+            Text("The C stick presses the C buttons as you push it, two at once on the diagonals")
+                .font(.rounded(.caption2)).foregroundStyle(Theme.inkDim)
+        }
+        .padding(.top, 4)
     }
 
     /// The analog stick's tuning (Nintendo 64): true analog always; these shape it.

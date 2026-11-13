@@ -1,5 +1,37 @@
 # HANDOFF: Duo Emulator ("Foldback")
 
+## Update, 13 Nov 2026 (build 6: big N64 deck, C stick option, bigger C buttons)
+Gordon asked "did n64 not have 2 sticks" after trying build 5, then sent a rival's portrait layout he likes.
+- **New N64 deck** (portrait and Duo table, `N64Layout.deck`): the layout ideas only, in our own Graphite/Ember (no console
+  colours). L and R are wide tabs in the top corners, with rewind / menu / fast-forward small between them. The stick is
+  top left (about 36 % of the width) with the D-pad, as big, under it. **A, B and Z are three big ember face buttons**
+  (Z top, B left, A lower right; Z is no longer a shoulder on the deck, though book and landscape keep it as one). The
+  C buttons are a tight diamond bottom right (`cCluster(spread: 0.75)`, about 60 pt each on a phone). Start is small in
+  the middle. No vent slots on the N64 deck.
+- **C stick option:** `Control.Kind.cStick`, a digital second stick for C up/down/left/right (`CStickMath` in
+  `TouchSurface.swift`): engages at 40 % of the radius and lets go inside 30 %; eight 45-degree sectors, so diagonals
+  press two C buttons; a held direction keeps 8 extra degrees; lifting the thumb releases it and the knob springs
+  back. It is drawn in sand with four arrows (`CStickView`), VoiceOver "C stick". Every N64 layout carries both the
+  cluster and the stick in the same place, and `N64Layout.camera(_:cStick:)` shows one of them. Old saved layouts get a
+  stick made over their cluster (`withCStick`). The editor keeps both, so moving one never loses the other's place;
+  the hidden one is just not drawn.
+- **The choice:** `LayoutOptions.cStick` in `LayoutStore` (`<system>-options[-game].json`, game, then system, then
+  default **C buttons**). The switch is in the layout editor: **pause menu › Edit controls ›** (no control selected)
+  **Camera: C buttons / C stick › Done**. The editor's scope chip (This game / All games) decides where it's saved.
+  DEBUG `-n64CStick YES|NO` forces it.
+- **C button sizes** (old → new): portrait phone deck 39 → 60 pt; Duo table guesses 384x270 37.5 → 45, 330x250
+  33.7 → 41 (the only deck under 44); landscape 852-wide 33.5 → 44, 667-wide (SE) 21 → 32 (the margin is ~103 pt);
+  book right page 422x140 29.5 → 44, 260x120 24 → 39. Book and landscape fit the cluster with a small solver
+  (`fitCluster` / `cameraControls`: from 44 pt down to the old size, nudged until nothing touches).
+- **Tests:** app unit tests for the C-stick mapping (thresholds, hysteresis, diagonals, release), camera swap, old
+  layouts, option resolution, sizes; N64 UI tests for the C stick in portrait/table/landscape/book and the editor
+  switch. **Simulator only** (Shared iPhone 17e; N64 shows through the VI fallback): shots `docs/shots/iphone-n64.png`,
+  `iphone-n64-cstick.png`, `table-n64.png`, `table-n64-cstick.png`, `iphone-landscape-n64.png`,
+  `iphone-landscape-n64-cstick.png`, `book-n64.png`, `book-n64-cstick.png`, `editor-n64-cstick.png`. **Needs
+  Gordon's device:** how the C stick feels for the camera, whether 40 %/30 % is right, and thumb reach on the new deck.
+
+---
+
 ## Update, 13 Nov 2026 (build 5: N64 unhidden, paraLLEl-RDP in normal play)
 Gordon's decision: N64 ships in the first App Store release **if his own games work** through TestFlight. Build 5 is
 for that test (internal TestFlight only, never App Review).

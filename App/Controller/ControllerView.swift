@@ -56,7 +56,61 @@ struct ControlArt: View {
         case .stick:
             StickView(knob: model.stickKnob, base: model.stickBase, active: model.stickValue != .centre,
                       outerRing: outerRing ?? model.settings.stickOuterRing)
+        case .cStick:
+            CStickView(knob: model.cStickKnob, pressed: model.pressed.intersection([.cUp, .cDown, .cLeft, .cRight]))
         }
+    }
+}
+
+// MARK: - C stick
+
+/// The C buttons as a second stick: a sand well (the C buttons' colour, so it never reads as the
+/// analog stick) with an arrow at each C direction, lit while pressed, and a small sand knob that
+/// follows the thumb and springs back to the centre on release.
+struct CStickView: View {
+    var knob: CGVector
+    var pressed: InputState
+
+    var body: some View {
+        GeometryReader { geo in
+            let s = min(geo.size.width, geo.size.height)
+            ZStack {
+                Circle()
+                    .fill(RadialGradient(colors: [Theme.sandDeep.opacity(0.42), Theme.sandDeep.opacity(0.16)],
+                                         center: .center, startRadius: s * 0.1, endRadius: s * 0.5))
+                Circle()
+                    .strokeBorder(Theme.sand.opacity(0.55), lineWidth: max(1.5, s * 0.022))
+                ForEach(Array(arrows.enumerated()), id: \.offset) { _, a in
+                    Image(systemName: "arrowtriangle.up.fill")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: s * 0.11, height: s * 0.09)
+                        .foregroundStyle(pressed.contains(a.button) ? Theme.ember : Theme.sand.opacity(0.85))
+                        .offset(y: -s * 0.39)
+                        .rotationEffect(.degrees(a.degrees))
+                }
+                ZStack {
+                    Circle()
+                        .fill(RadialGradient(colors: [Theme.sand, Theme.sandDeep],
+                                             center: UnitPoint(x: 0.38, y: 0.32), startRadius: 0, endRadius: s * 0.24))
+                        .shadow(color: .black.opacity(0.55), radius: s * 0.03, y: s * 0.025)
+                    Circle()
+                        .stroke(Color.black.opacity(0.22), lineWidth: s * 0.015)
+                        .padding(s * 0.05)
+                }
+                .frame(width: s * 0.4, height: s * 0.4)
+                .offset(x: knob.dx, y: knob.dy)
+            }
+            .frame(width: s, height: s)
+            .frame(width: geo.size.width, height: geo.size.height)
+        }
+        .accessibilityElement()
+        .accessibilityLabel("C stick")
+        .accessibilityHint("Push to press the C buttons, two at once on the diagonals")
+    }
+
+    private var arrows: [(button: InputState, degrees: Double)] {
+        [(.cUp, 0), (.cRight, 90), (.cDown, 180), (.cLeft, 270)]
     }
 }
 

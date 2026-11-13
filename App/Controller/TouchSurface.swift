@@ -32,9 +32,11 @@ struct TouchSurface: UIViewRepresentable {
         var controls: [Control] = []
         weak var model: ControllerModel?
 
-        private enum Owner { case dpad, buttons, pill(InputState), menu, fastForward, rewind, stick(CGPoint), none }
+        private enum Owner { case dpad, buttons, pill(InputState), menu, fastForward, rewind, stick(CGPoint), cStick, none }
         private var owners: [ObjectIdentifier: Owner] = [:]
         private var points: [ObjectIdentifier: CGPoint] = [:]
+        /// The C buttons the C stick holds (kept between moves for its hysteresis).
+        private var cStickHeld: InputState = []
 
         override init(frame: CGRect) {
             super.init(frame: frame)
@@ -55,6 +57,10 @@ struct TouchSurface: UIViewRepresentable {
                     // One thumb on the stick at a time; a second touch there does nothing.
                     let taken = owners.contains { key, o in if case .stick = o, key != id { true } else { false } }
                     owners[id] = taken ? Owner.none : .stick(stickOrigin(for: p))
+                }
+                if case .cStick = owners[id] {
+                    let taken = owners.contains { key, o in if case .cStick = o, key != id { true } else { false } }
+                    if taken { owners[id] = Owner.none }
                 }
             }
             recompute()
@@ -85,6 +91,7 @@ struct TouchSurface: UIViewRepresentable {
         func releaseAll() {
             owners.removeAll()
             points.removeAll()
+            cStickHeld = []
             MainActor.assumeIsolated { model?.releaseAll() }
         }
 
@@ -115,10 +122,16 @@ struct TouchSurface: UIViewRepresentable {
                         if pass == 1 && stickHit(c, p) || pass == 0 && c.frame.contains(p) { return .stick(.zero) }
                         continue
                     }
+                    if c.kind == .cStick {
+                        let near = hypot(p.x - c.frame.midX, p.y - c.frame.midY) <= c.frame.width / 2 * 1.12
+                        if pass == 1 && near || pass == 0 && c.frame.contains(p) { return .cStick }
+                        continue
+                    }
                     let r = pass == 0 ? c.frame : c.hitFrame
                     guard r.contains(p) else { continue }
                     switch c.kind {
                     case .stick: return .stick(.zero)
+                    case .cStick: return .cStick
                     case .dpad: return .dpad
                     case .face, .shoulder, .combo: return .buttons
                     case .pill(let s, _): return .pill(s)
@@ -136,6 +149,7 @@ struct TouchSurface: UIViewRepresentable {
             var vector = CGVector.zero
             var menu = false, ff = false, rewind = false
             var stick = AnalogStick.centre, knob = CGVector.zero, base = CGVector.zero
+            var cHeld: InputState = [], cKnob = CGVector.zero
             for (id, owner) in owners {
                 guard let p = points[id] else { continue }
                 switch owner {
@@ -174,13 +188,21 @@ struct TouchSurface: UIViewRepresentable {
                                             deadZone: st.stickDeadZone)
                     base = CGVector(dx: origin.x - centre.x, dy: origin.y - centre.y)
                     knob = StickMath.knob(thumb: p, origin: origin, radius: radius)
+                case .cStick:
+                    guard let c = controls.first(where: { $0.kind == .cStick }) else { break }
+                    let centre = CGPoint(x: c.frame.midX, y: c.frame.midY)
+                    cHeld = CStickMath.buttons(thumb: p, origin: centre, radius: c.frame.width / 2, held: cStickHeld)
+                    cKnob = StickMath.knob(thumb: p, origin: centre, radius: c.frame.width / 2)
                 case .menu: menu = true
                 case .fastForward: ff = true
                 case .rewind: rewind = true
                 case .none: break
                 }
             }
+            cStickHeld = cHeld
+            pressed.formUnion(cHeld)
             MainActor.assumeIsolated {
+                model?.updateCStick(knob: cKnob)
                 model?.updateStick(stick, knob: knob, base: base)
                 model?.update(pressed: pressed, dpad: vector, menu: menu, fastForward: ff, rewind: rewind)
             }
@@ -246,5 +268,40 @@ enum StickMath {
         let limit = radius * 0.62
         guard dist > limit, dist > 0 else { return CGVector(dx: dx, dy: dy) }
         return CGVector(dx: dx / dist * limit, dy: dy / dist * limit)
+    }
+}
+
+/// The C stick's maths (pure, so it can be unit-tested): a digital stick for the four C buttons.
+///
+/// Nothing is pressed until the thumb is `engage` x the radius out from the centre; once pressed,
+/// it holds until the thumb comes back inside `release` (hysteresis, so a thumb resting on the edge
+/// doesn't chatter). The circle is split into eight 45-degree sectors: the four cardinal ones press
+/// one C button, the diagonal ones two. A held direction keeps `angleHold` extra degrees so it
+/// doesn't flicker on a sector edge. Lifting the thumb releases everything (the knob re-centres).
+enum CStickMath {
+    static let engage: Double = 0.40
+    static let release: Double = 0.30
+    static let angleHold: Double = 8
+
+    static func buttons(thumb p: CGPoint, origin: CGPoint, radius: CGFloat, held: InputState) -> InputState {
+        let dx = Double(p.x - origin.x), dy = Double(origin.y - p.y)   // up is positive
+        let r = Double(radius)
+        guard r > 0 else { return [] }
+        let m = (dx * dx + dy * dy).squareRoot() / r
+        let active = held.intersection([.cUp, .cDown, .cLeft, .cRight])
+        guard m >= (active.isEmpty ? engage : release) else { return [] }
+        var angle = atan2(dy, dx) * 180 / .pi   // 0 = right, 90 = up
+        if angle < 0 { angle += 360 }
+        func within(_ centre: Double, _ s: InputState) -> Bool {
+            var d = abs(angle - centre).truncatingRemainder(dividingBy: 360)
+            if d > 180 { d = 360 - d }
+            return d < 67.5 + (active.contains(s) ? angleHold : 0)
+        }
+        var out: InputState = []
+        if within(0, .cRight) { out.insert(.cRight) }
+        if within(90, .cUp) { out.insert(.cUp) }
+        if within(180, .cLeft) { out.insert(.cLeft) }
+        if within(270, .cDown) { out.insert(.cDown) }
+        return out
     }
 }

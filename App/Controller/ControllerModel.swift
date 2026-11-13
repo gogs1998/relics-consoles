@@ -18,6 +18,9 @@ struct Control: Identifiable, Hashable, Codable {
         case rewind
         /// A true analog thumbstick (Nintendo 64). Its tuning lives in `ControlSettings`.
         case stick
+        /// The Nintendo 64's C buttons as a second, digital stick (the "C stick" camera option):
+        /// pushing it presses C up / down / left / right, two at once on the diagonals.
+        case cStick
     }
 
     enum Tone: Hashable, Codable { case ember, sand }
@@ -43,6 +46,7 @@ struct Control: Identifiable, Hashable, Codable {
             switch kind {
             case .dpad: self.haptic = 0.4
             case .stick: self.haptic = 0
+            case .cStick: self.haptic = 0.4
             case .menu, .fastForward, .rewind, .pill: self.haptic = 0.45
             default: self.haptic = 0.6
             }
@@ -54,6 +58,7 @@ struct Control: Identifiable, Hashable, Codable {
     var buttons: InputState {
         switch kind {
         case .face(let s, _, _), .pill(let s, _), .shoulder(let s, _), .combo(let s, _): s
+        case .cStick: [.cUp, .cDown, .cLeft, .cRight]
         default: []
         }
     }
@@ -69,6 +74,7 @@ struct Control: Identifiable, Hashable, Codable {
         case .fastForward: "ff"
         case .rewind: "rewind"
         case .stick: "stick"
+        case .cStick: "cstick"
         }
     }
 
@@ -77,7 +83,7 @@ struct Control: Identifiable, Hashable, Codable {
         var r: CGRect
         switch kind {
         case .dpad: r = frame.insetBy(dx: -frame.width * 0.3, dy: -frame.height * 0.3)
-        case .stick: r = frame.insetBy(dx: -frame.width * 0.12, dy: -frame.height * 0.12)
+        case .stick, .cStick: r = frame.insetBy(dx: -frame.width * 0.12, dy: -frame.height * 0.12)
         case .face: r = frame.insetBy(dx: -frame.width * 0.28, dy: -frame.height * 0.28)
         case .combo: return frame   // sits between buttons: no expansion into them
         case .pill: r = frame.insetBy(dx: -8, dy: -12)
@@ -120,6 +126,8 @@ final class ControllerModel {
     private(set) var stickValue = AnalogStick.centre
     private(set) var stickKnob: CGVector = .zero
     private(set) var stickBase: CGVector = .zero
+    /// Where the C stick's knob is drawn (offset in points from its centre; zero when released).
+    private(set) var cStickKnob: CGVector = .zero
     var hapticsEnabled = true
     /// From the layout in use: diagonal sector width, D-pad dead zone, per-button haptics.
     private(set) var settings = ControlSettings()
@@ -181,6 +189,11 @@ final class ControllerModel {
         latch?.touchStick.store(InputLatch.pack(value), ordering: .relaxed)
     }
 
+    /// The C stick's knob moved (its buttons arrive through `update(pressed:)`).
+    func updateCStick(knob: CGVector) {
+        if knob != cStickKnob { cStickKnob = knob }
+    }
+
     func update(pressed newPressed: InputState, dpad: CGVector, menu: Bool, fastForward: Bool, rewind: Bool) {
         let added = newPressed.subtracting(pressed)
         let dpadBits: InputState = [.up, .down, .left, .right]
@@ -220,6 +233,7 @@ final class ControllerModel {
         pressed = []
         dpadVector = .zero
         updateStick(.centre, knob: .zero, base: .zero)
+        updateCStick(knob: .zero)
         menuDown = false
         fastForwardDown = false
         rewindDown = false
