@@ -33,6 +33,10 @@
 #include "osal/dynamiclib.h"
 #include "plugin/plugin.h"
 
+#ifdef N64_RDP_SPIKE   // N64 RDP feasibility spike only (Spikes/N64RDP); never defined by CoreKit or the app
+#include "n64_rdp_spike.h"
+#endif
+
 // rsp-hle's entry points, renamed by glue/units/rsphle_plugin.c.
 m64p_error rsphle_PluginStartup(m64p_dynlib_handle, void*, void (*)(void*, int, const char*));
 m64p_error rsphle_PluginShutdown(void);
@@ -124,6 +128,9 @@ static inline uint32_t expand5(uint32_t v) { return (v << 3) | (v >> 2); }
 /// Copies the framebuffer the VI is showing into `fb`, scaled to 320 x 240.
 static void scan_out(N64Handle* h)
 {
+#ifdef N64_RDP_SPIKE
+    if (n64spike_scan_out(h->fb, N64_SCREEN_WIDTH, N64_SCREEN_HEIGHT)) return;
+#endif
     const uint32_t status = *g_gfx.VI_STATUS_REG;
     const uint32_t type = status & 3;
     const uint32_t width = *g_gfx.VI_WIDTH_REG & 0xFFF;
@@ -216,9 +223,15 @@ static void v_ChangeWindow(void) {}
 static int v_InitiateGFX(GFX_INFO info) { g_gfx = info; return 1; }
 static void v_MoveScreen(int x, int y) { (void)x; (void)y; }
 static void v_ProcessDList(void) {}
+#ifdef N64_RDP_SPIKE
+static void v_ProcessRDPList(void) { n64spike_process_rdp_list(); }
+static void v_RomClosed(void) { n64spike_gfx_shutdown(); }
+static int v_RomOpen(void) { n64spike_gfx_init(&g_gfx); return 1; }
+#else
 static void v_ProcessRDPList(void) {}
 static void v_RomClosed(void) {}
 static int v_RomOpen(void) { return 1; }
+#endif
 static void v_ShowCFB(void) {}
 static void v_ViStatusChanged(void) {}
 static void v_ViWidthChanged(void) {}
@@ -356,12 +369,22 @@ static const ProcEntry kCoreProcs[] = {
     P("ConfigGetUserCachePath", ConfigGetUserCachePath),
     { NULL, NULL },
 };
+#ifdef N64_RDP_SPIKE
+static void spike_InitiateRSP(RSP_INFO info, unsigned int* cycles) { n64spike_rsp_InitiateRSP(&info, cycles); }
+static const ProcEntry kRspProcs[] = {
+    P("PluginStartup", rsphle_PluginStartup), P("PluginShutdown", rsphle_PluginShutdown),
+    P("PluginGetVersion", rsphle_PluginGetVersion), P("DoRspCycles", n64spike_rsp_DoRspCycles),
+    P("InitiateRSP", spike_InitiateRSP), P("RomClosed", n64spike_rsp_RomClosed),
+    { NULL, NULL },
+};
+#else
 static const ProcEntry kRspProcs[] = {
     P("PluginStartup", rsphle_PluginStartup), P("PluginShutdown", rsphle_PluginShutdown),
     P("PluginGetVersion", rsphle_PluginGetVersion), P("DoRspCycles", rsphle_DoRspCycles),
     P("InitiateRSP", rsphle_InitiateRSP), P("RomClosed", rsphle_RomClosed),
     { NULL, NULL },
 };
+#endif
 static const ProcEntry kGfxProcs[] = {
     P("PluginGetVersion", v_PluginGetVersion), P("ChangeWindow", v_ChangeWindow),
     P("InitiateGFX", v_InitiateGFX), P("MoveScreen", v_MoveScreen), P("ProcessDList", v_ProcessDList),
@@ -541,6 +564,9 @@ N64Handle* n64_create(const uint8_t* rom, size_t romSize, const uint8_t* battery
     unpack_battery(h, battery, batterySize);
 
     rsphle_PluginStartup(HANDLE(kCoreProcs), NULL, debug_callback);
+#ifdef N64_RDP_SPIKE
+    n64spike_rsp_startup(HANDLE(kCoreProcs), debug_callback);
+#endif
     if (CoreAttachPlugin(M64PLUGIN_GFX, HANDLE(kGfxProcs)) != M64ERR_SUCCESS ||
         CoreAttachPlugin(M64PLUGIN_AUDIO, HANDLE(kAudioProcs)) != M64ERR_SUCCESS ||
         CoreAttachPlugin(M64PLUGIN_INPUT, HANDLE(kInputProcs)) != M64ERR_SUCCESS ||
@@ -598,6 +624,9 @@ void n64_destroy(N64Handle* h)
     CoreDetachPlugin(M64PLUGIN_INPUT);
     CoreDetachPlugin(M64PLUGIN_RSP);
     rsphle_PluginShutdown();
+#ifdef N64_RDP_SPIKE
+    n64spike_rsp_shutdown();
+#endif
     CoreDoCommand(M64CMD_ROM_CLOSE, 0, NULL);
     CoreShutdown();
     pthread_mutex_destroy(&h->lock);

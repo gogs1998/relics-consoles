@@ -1,5 +1,17 @@
 # HANDOFF: Duo Emulator ("Foldback")
 
+## Update, 13 Nov 2026 (N64 RDP spike: paraLLEl-RDP + MoltenVK + cxd4, throwaway)
+- **Findings: `docs/n64-rdp-spike.md`.** M4 Mac mini, our own bench ROM (`Spikes/N64RDP/rom/`): busy load (2,000
+  textured Z-buffered tris, 2x fill, our RSP microcode) **153 fps** synchronous, stress load (4,000 tris, 3x fill)
+  **107 fps** (131 async); full speed is 60. CPU-bound (R4300 interpreter + cxd4), GPU 1.7 ms. iPhone estimate
+  ~70-105 fps busy on A15-A18 Pro. Recommendation: **v2, provisionally**, pending Gordon's device run (doc §8:
+  `Spikes/N64RDP/ios`, `xcodegen generate`, scheme N64Bench, Run on the plugged-in iPhone).
+- Licences: paraLLEl-RDP/Granite/volk MIT, Vulkan-Headers + MoltenVK Apache-2.0 (GPLv3-only combination, fine),
+  cxd4 CC0. Sources in `ThirdParty-src/` (gitignored). Not wired into the app: `n64_glue.c` hooks are
+  `#ifdef N64_RDP_SPIKE` only; Release check passes with zero warnings.
+
+---
+
 ## Update, 13 Nov 2026 (build 3 on TestFlight: N64 hidden, demo shelf)
 - **Build 3 uploaded to TestFlight** (internal only; Gordon approved; NOT submitted for review). Archive checked:
   CFBundleVersion 3, no N64 document types in Info.plist, the five demos in `Demos/`.
