@@ -78,7 +78,38 @@ func framebufferHash(_ fb: UnsafeBufferPointer<UInt32>) -> UInt32 {
 }
 
 @Suite struct NESMapperTests {
-    @Test(arguments: ["mmc1_probe.nes", "uxrom_probe.nes", "cnrom_probe.nes", "mmc3_probe.nes"])
+    /// Each new mapper's state survives a save/load byte for byte (latches, $6000 window, counter).
+    @Test(arguments: ["mmc2_probe.nes", "mmc4_probe.nes", "colordreams_probe.nes", "gxrom_probe.nes", "fme7_probe.nes"])
+    func newMapperStatesAreDeterministic(_ name: String) throws {
+        let nes = try NESSystem(rom: try testROM(name), battery: nil)
+        for _ in 0..<3 { nes.runFrame(input: []) }
+        let start = nes.saveState()
+        for _ in 0..<10 { nes.runFrame(input: []) }
+        let after = nes.saveState()
+        try nes.loadState(start)
+        for _ in 0..<10 { nes.runFrame(input: []) }
+        #expect(nes.saveState() == after)
+    }
+
+    /// The FME-7 counter: IRQ exactly as it wraps past zero, and only when enabled.
+    @Test func fme7CounterWraps() throws {
+        let nes = try NESSystem(rom: try testROM("fme7_probe.nes"), battery: nil)
+        let m = try #require(nes.mapper as? FME7)
+        m.write(0x8000, 0x0E, cycle: 0); m.write(0xA000, 2, cycle: 0)
+        m.write(0x8000, 0x0F, cycle: 0); m.write(0xA000, 0, cycle: 0)
+        m.write(0x8000, 0x0D, cycle: 0); m.write(0xA000, 0x81, cycle: 0)
+        m.cpuCycle(); m.cpuCycle()
+        #expect(!m.irqAsserted)          // 2 -> 1 -> 0
+        m.cpuCycle()
+        #expect(m.irqAsserted)           // 0 -> $FFFF
+        m.write(0x8000, 0x0D, cycle: 0); m.write(0xA000, 0x80, cycle: 0)
+        #expect(!m.irqAsserted)          // acknowledged; counting without IRQ
+        for _ in 0..<0x10000 { m.cpuCycle() }
+        #expect(!m.irqAsserted)
+    }
+
+    @Test(arguments: ["mmc1_probe.nes", "uxrom_probe.nes", "cnrom_probe.nes", "mmc3_probe.nes",
+                      "mmc2_probe.nes", "mmc4_probe.nes", "colordreams_probe.nes", "gxrom_probe.nes", "fme7_probe.nes"])
     func mapperProbePasses(_ name: String) throws {
         let nes = try NESSystem(rom: try testROM(name), battery: nil)
         for _ in 0..<40 { nes.runFrame(input: []) }

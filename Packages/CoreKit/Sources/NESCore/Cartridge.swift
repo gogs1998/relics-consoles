@@ -33,6 +33,16 @@ final class Cartridge {
     var prgRAMEnabled = true
     var prgRAMWritable = true
     var mirroring: Mirroring
+    /// $6000-$7FFF from PRG ROM at this offset (FME-7), or -1 for PRG RAM.
+    var prgLowROM = -1
+
+    /// MMC2 (9) / MMC4 (10) CHR latches: 0 when the mapper has none. A PPU fetch of tile $FD or
+    /// $FE's upper plane flips the latch for that pattern table; the next fetch sees the new bank.
+    var latchKind = 0
+    var latch0: UInt8 = 0xFE
+    var latch1: UInt8 = 0xFE
+    /// 4 KB CHR banks: $0000 when latch 0 = FD, = FE; $1000 when latch 1 = FD, = FE.
+    var latchBanks: (UInt8, UInt8, UInt8, UInt8) = (0, 0, 0, 0)
 
     init(rom data: Data) throws {
         let b = [UInt8](data)
@@ -147,7 +157,37 @@ final class Cartridge {
 
     @inline(__always)
     func readCHR(_ addr: UInt16) -> UInt8 {
-        chr[chrBank[Int(addr >> 10) & 7] + Int(addr & 0x3FF)]
+        let v = chr[chrBank[Int(addr >> 10) & 7] + Int(addr & 0x3FF)]
+        if latchKind != 0 { latchFetched(addr) }
+        return v
+    }
+
+    /// MMC2 watches $0FD8 / $0FE8 exactly for latch 0; MMC4 the whole rows $0FD8-$0FDF and
+    /// $0FE8-$0FEF. Both watch $1FD8-$1FDF / $1FE8-$1FEF for latch 1.
+    func latchFetched(_ addr: UInt16) {
+        let a = addr & 0x1FFF
+        if a < 0x1000 {
+            let key = latchKind == 9 ? a : a & 0xFFF8
+            if key == 0x0FD8 { latch0 = 0xFD } else if key == 0x0FE8 { latch0 = 0xFE } else { return }
+        } else {
+            switch a & 0xFFF8 {
+            case 0x1FD8: latch1 = 0xFD
+            case 0x1FE8: latch1 = 0xFE
+            default: return
+            }
+        }
+        applyLatches()
+    }
+
+    func applyLatches() {
+        setCHR4K(0, Int(latch0 == 0xFD ? latchBanks.0 : latchBanks.1))
+        setCHR4K(1, Int(latch1 == 0xFD ? latchBanks.2 : latchBanks.3))
+    }
+
+    @inline(__always)
+    func readLow(_ addr: UInt16, openBus: UInt8) -> UInt8 {
+        if prgLowROM >= 0 { return prg[prgLowROM + Int(addr & 0x1FFF)] }
+        return prgRAMEnabled ? prgRAM[Int(addr & 0x1FFF)] : openBus
     }
 
     @inline(__always)
@@ -187,6 +227,9 @@ class Mapper {
     func write(_ addr: UInt16, _ value: UInt8, cycle: UInt64) {}
     /// Called near dot 260 of each rendered line while rendering is on (MMC3's counter).
     func scanline() {}
+    /// True if `cpuCycle()` must run every CPU cycle (FME-7's IRQ counter).
+    var clocksCPU: Bool { false }
+    func cpuCycle() {}
     func sync(_ s: inout StateCoder) {}
 
     static func make(for cart: Cartridge) throws -> Mapper {
@@ -197,6 +240,11 @@ class Mapper {
         case 3: return CNROM(cart: cart)
         case 4: return MMC3(cart: cart)
         case 7: return AxROM(cart: cart)
+        case 9: return MMC2(cart: cart, mmc4: false)
+        case 10: return MMC2(cart: cart, mmc4: true)
+        case 11: return ColorDreams(cart: cart)
+        case 66: return GxROM(cart: cart)
+        case 69: return FME7(cart: cart)
         default: throw CoreError.unsupportedMapper(cart.mapperNumber)
         }
     }
@@ -422,5 +470,183 @@ final class MMC3: Mapper {
         s.sync(&bankSelect); s.array(&regs); s.sync(&mirrorReg); s.sync(&ramProtect)
         s.sync(&irqLatch); s.sync(&irqCounter); s.sync(&irqReload); s.sync(&irqEnabled); s.sync(&irqAsserted)
         if s.isReading { apply() }
+    }
+}
+
+/// Mappers 9 (MMC2, PxROM) and 10 (MMC4, FxROM): PRG bank at $8000 (8 KB on MMC2, 16 KB on
+/// MMC4), four 4 KB CHR registers chosen by the two latches, and a mirroring register.
+final class MMC2: Mapper {
+    let mmc4: Bool
+    var prgReg: UInt8 = 0
+    var mirror: UInt8 = 0
+    var regs = [UInt8](repeating: 0, count: 4)
+
+    init(cart: Cartridge, mmc4: Bool) {
+        self.mmc4 = mmc4
+        super.init(cart: cart)
+        cart.latchKind = mmc4 ? 10 : 9
+        cart.latch0 = 0xFE
+        cart.latch1 = 0xFE
+        apply()
+    }
+
+    override func write(_ addr: UInt16, _ value: UInt8, cycle: UInt64) {
+        switch addr & 0xF000 {
+        case 0xA000: prgReg = value & 0x0F
+        case 0xB000: regs[0] = value & 0x1F
+        case 0xC000: regs[1] = value & 0x1F
+        case 0xD000: regs[2] = value & 0x1F
+        case 0xE000: regs[3] = value & 0x1F
+        case 0xF000: mirror = value & 1
+        default: return
+        }
+        apply()
+    }
+
+    private func apply() {
+        if mmc4 {
+            cart.setPRG16K(0, Int(prgReg))
+            cart.setPRG16K(1, -1)
+        } else {
+            cart.setPRG8K(0, Int(prgReg))
+            cart.setPRG8K(1, -3)
+            cart.setPRG8K(2, -2)
+            cart.setPRG8K(3, -1)
+        }
+        cart.latchBanks = (regs[0], regs[1], regs[2], regs[3])
+        cart.applyLatches()
+        if cart.headerMirroring != .fourScreen { cart.mirroring = mirror == 1 ? .horizontal : .vertical }
+    }
+
+    override func sync(_ s: inout StateCoder) {
+        s.section("MMC2")
+        s.sync(&prgReg); s.sync(&mirror); s.array(&regs)
+        s.sync(&cart.latch0); s.sync(&cart.latch1)
+        if s.isReading { apply() }
+    }
+}
+
+/// Mapper 11 (Color Dreams): one register anywhere in $8000-$FFFF, 32 KB PRG in bits 0-1 and
+/// 8 KB CHR in bits 4-7. The board has bus conflicts: the ROM byte under the write wins ties.
+final class ColorDreams: Mapper {
+    var reg: UInt8 = 0
+    override init(cart: Cartridge) {
+        super.init(cart: cart)
+        apply()
+    }
+    override func write(_ addr: UInt16, _ value: UInt8, cycle: UInt64) {
+        reg = value & cart.readPRG(addr)
+        apply()
+    }
+    private func apply() {
+        cart.setPRG32K(Int(reg & 0x03))
+        cart.setCHR8K(Int(reg >> 4))
+    }
+    override func sync(_ s: inout StateCoder) {
+        s.section("CDRM")
+        s.sync(&reg)
+        if s.isReading { apply() }
+    }
+}
+
+/// Mapper 66 (GxROM / MHROM): 32 KB PRG in bits 4-5, 8 KB CHR in bits 0-1, bus conflicts.
+final class GxROM: Mapper {
+    var reg: UInt8 = 0
+    override init(cart: Cartridge) {
+        super.init(cart: cart)
+        apply()
+    }
+    override func write(_ addr: UInt16, _ value: UInt8, cycle: UInt64) {
+        reg = value & cart.readPRG(addr)
+        apply()
+    }
+    private func apply() {
+        cart.setPRG32K(Int((reg >> 4) & 0x03))
+        cart.setCHR8K(Int(reg & 0x03))
+    }
+    override func sync(_ s: inout StateCoder) {
+        s.section("GXRM")
+        s.sync(&reg)
+        if s.isReading { apply() }
+    }
+}
+
+/// Mapper 69 (Sunsoft FME-7): a command register ($8000) and its parameter ($A000). Commands 0-7
+/// are 1 KB CHR banks, 8 the $6000 window (ROM bank, or RAM when bit 6 is set, enabled by bit 7),
+/// 9-B 8 KB PRG banks at $8000/$A000/$C000 ($E000 is the last bank), C mirroring, D IRQ control,
+/// E/F the 16-bit counter, which counts down every CPU cycle and raises the IRQ as it wraps
+/// from $0000 to $FFFF. The 5B sound chip ($C000/$E000) is not emulated.
+final class FME7: Mapper {
+    var command: UInt8 = 0
+    var regs = [UInt8](repeating: 0, count: 16)
+    var irqEnabled = false
+    var counterEnabled = false
+    var counter: UInt16 = 0
+
+    override init(cart: Cartridge) {
+        super.init(cart: cart)
+        for c in 0..<0x0D { apply(UInt8(c)) }
+    }
+
+    override var clocksCPU: Bool { true }
+
+    override func write(_ addr: UInt16, _ value: UInt8, cycle: UInt64) {
+        switch addr & 0xE000 {
+        case 0x8000:
+            command = value & 0x0F
+        case 0xA000:
+            regs[Int(command)] = value
+            switch command {
+            case 0x0D:
+                irqEnabled = (value & 0x01) != 0
+                counterEnabled = (value & 0x80) != 0
+                irqAsserted = false
+            case 0x0E: counter = (counter & 0xFF00) | UInt16(value)
+            case 0x0F: counter = (counter & 0x00FF) | UInt16(value) << 8
+            default: apply(command)
+            }
+        default:
+            break   // 5B audio registers
+        }
+    }
+
+    private func apply(_ c: UInt8) {
+        let v = regs[Int(c)]
+        switch c {
+        case 0...7: cart.setCHR1K(Int(c), Int(v))
+        case 8:
+            if (v & 0x40) != 0 {
+                cart.prgLowROM = -1
+                cart.prgRAMEnabled = (v & 0x80) != 0
+                cart.prgRAMWritable = cart.prgRAMEnabled
+            } else {
+                cart.prgLowROM = cart.prgOffset8K(Int(v & 0x3F))
+            }
+        case 9, 0x0A, 0x0B:
+            cart.setPRG8K(Int(c) - 9, Int(v & 0x3F))
+            cart.setPRG8K(3, -1)
+        case 0x0C:
+            switch v & 3 {
+            case 0: cart.mirroring = .vertical
+            case 1: cart.mirroring = .horizontal
+            case 2: cart.mirroring = .singleLow
+            default: cart.mirroring = .singleHigh
+            }
+        default: break
+        }
+    }
+
+    @inline(__always)
+    override func cpuCycle() {
+        guard counterEnabled else { return }
+        counter &-= 1
+        if counter == 0xFFFF && irqEnabled { irqAsserted = true }
+    }
+
+    override func sync(_ s: inout StateCoder) {
+        s.section("FME7")
+        s.sync(&command); s.array(&regs)
+        s.sync(&irqEnabled); s.sync(&counterEnabled); s.sync(&counter); s.sync(&irqAsserted)
+        if s.isReading { for c in 0..<0x0D { apply(UInt8(c)) } }
     }
 }

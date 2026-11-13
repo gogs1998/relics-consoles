@@ -47,6 +47,9 @@ public final class NESSystem: EmulatorCore {
     var pad2Shift: UInt8 = 0
     var openBus: UInt8 = 0
 
+    /// The mapper counts CPU cycles (FME-7).
+    private var mapperClocked = false
+
     public init(rom: Data, battery: Data?) throws {
         cart = try Cartridge(rom: rom)
         mapper = try Mapper.make(for: cart)
@@ -61,6 +64,7 @@ public final class NESSystem: EmulatorCore {
         ppu.cart = cart
         ppu.mapper = mapper
         ppu.trackA12 = mapper is MMC3
+        mapperClocked = mapper.clocksCPU
         reset()
     }
 
@@ -169,6 +173,7 @@ public final class NESSystem: EmulatorCore {
         ppu.step(); ppu.step(); ppu.step()
         apu.step()
         cycles &+= 1
+        if mapperClocked { mapper.cpuCycle() }
         prevNeedNMI = needNMI
         if ppu.nmiEdge { needNMI = true; ppu.nmiEdge = false }
         prevNMILine = ppu.nmiLine
@@ -204,7 +209,7 @@ public final class NESSystem: EmulatorCore {
     func peek(_ addr: UInt16) -> UInt8 {
         switch addr {
         case 0x0000..<0x2000: return ram[Int(addr & 0x7FF)]
-        case 0x6000..<0x8000: return cart.prgRAMEnabled ? cart.prgRAM[Int(addr & 0x1FFF)] : openBus
+        case 0x6000..<0x8000: return cart.readLow(addr, openBus: openBus)
         case 0x8000...0xFFFF: return cart.readPRG(addr)
         default: return openBus
         }
@@ -219,7 +224,7 @@ public final class NESSystem: EmulatorCore {
             if ppu.cancelNMI { ppu.cancelNMI = false; needNMI = false; ppu.nmiEdge = false; ppu.nmiRiseCountdown = 0 }
             return v
         }
-        if addr >= 0x6000 { return cart.prgRAMEnabled ? cart.prgRAM[Int(addr & 0x1FFF)] : openBus }
+        if addr >= 0x6000 { return cart.readLow(addr, openBus: openBus) }
         switch addr {
         case 0x4015:
             return apu.readStatus() | (openBus & 0x20)
@@ -252,7 +257,7 @@ public final class NESSystem: EmulatorCore {
         if addr < 0x4000 { ppu.writeRegister(addr, value); return }
         if addr >= 0x8000 { mapper.write(addr, value, cycle: cycles); return }
         if addr >= 0x6000 {
-            if cart.prgRAMEnabled && cart.prgRAMWritable { cart.prgRAM[Int(addr & 0x1FFF)] = value }
+            if cart.prgLowROM < 0 && cart.prgRAMEnabled && cart.prgRAMWritable { cart.prgRAM[Int(addr & 0x1FFF)] = value }
             return
         }
         switch addr {
