@@ -47,6 +47,18 @@ struct PlayerView: View {
             model.controller.releaseAll()
             model.session.input.stylus.store(0, ordering: .relaxed)
         }
+        // Close-to-sleep: the hinge's closed posture (never its angle) pauses and saves; opening
+        // resumes exactly where play stopped. Every system goes through the same path.
+        .onChange(of: lidClosed, initial: true) { _, closed in
+            if closed { model.sleep(.lidClosed) } else { model.wake(.lidClosed) }
+        }
+        .overlay {
+            if model.isAsleepWithLidClosed { SleepVeil().transition(.opacity) }
+        }
+        .animation(.easeInOut(duration: 0.3), value: model.isAsleepWithLidClosed)
+        #if DEBUG
+        .task { await debugLidCycle() }
+        #endif
         .onChange(of: model.physicalMode) { _, physical in
             // The touch layout's auto-fire buttons don't carry over to a physical controller.
             if physical {
@@ -93,6 +105,30 @@ struct PlayerView: View {
         }
         #endif
     }
+
+    /// The Duo is folded shut (DuoKit's hinge posture), or DEBUG `-lidCycle` says so.
+    private var lidClosed: Bool {
+        #if DEBUG
+        if debugLidClosed { return true }
+        #endif
+        return stage.isClosed
+    }
+
+    #if DEBUG
+    @State private var debugLidClosed = false
+
+    /// DEBUG `-lidCycle 3,8`: pretend the lid closes 3 s after the player opens and opens again
+    /// at 8 s (the simulator has no hinge).
+    private func debugLidCycle() async {
+        guard let spec = UserDefaults.standard.string(forKey: "lidCycle") else { return }
+        let t = spec.split(separator: ",").compactMap { Double($0) }
+        guard t.count == 2, t[1] > t[0] else { return }
+        try? await Task.sleep(for: .seconds(t[0]))
+        debugLidClosed = true
+        try? await Task.sleep(for: .seconds(t[1] - t[0]))
+        debugLidClosed = false
+    }
+    #endif
 
     // MARK: arrangements
 
@@ -405,5 +441,30 @@ extension View {
     func place(_ r: CGRect) -> some View {
         frame(width: max(0, r.width), height: max(0, r.height))
             .position(x: r.midX, y: r.midY)
+    }
+}
+
+/// Shown while the lid is closed: the game is paused and saved.
+struct SleepVeil: View {
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.78)
+            VStack(spacing: 10) {
+                Image(systemName: "moon.zzz.fill")
+                    .font(.rounded(.largeTitle))
+                    .foregroundStyle(Theme.sand)
+                Text("Sleeping")
+                    .font(.rounded(.title3, weight: .heavy))
+                    .foregroundStyle(Theme.ink)
+                Text("Saved. Open to carry on where you left off.")
+                    .font(.rounded(.footnote))
+                    .foregroundStyle(Theme.inkDim)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(24)
+        }
+        .ignoresSafeArea()
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("player.sleeping")
     }
 }

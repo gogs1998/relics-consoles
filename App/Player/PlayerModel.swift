@@ -3,6 +3,7 @@ import CoreKit
 import Observation
 import SwiftUI
 import UIKit
+import os
 
 /// One play session, owned by the main actor: the emulation session plus audio, input and saves.
 @MainActor
@@ -129,18 +130,14 @@ final class PlayerModel {
         }
         #endif
         let center = NotificationCenter.default
+        // Background (or a system sheet over the app): sleep, exactly like closing the lid.
         observers.append(center.addObserver(forName: UIApplication.willResignActiveNotification, object: nil,
                                             queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated {
-                self?.controller.releaseAll()
-                self?.pause()
-                self?.writeAutoState()
-                self?.flushBattery()
-            }
+            MainActor.assumeIsolated { self?.sleep(.background) }
         })
         observers.append(center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil,
                                             queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { if self?.menuOpen == false { self?.resume() } }
+            MainActor.assumeIsolated { self?.wake(.background) }
         })
         observers.append(center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] note in
             let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
@@ -176,10 +173,49 @@ final class PlayerModel {
         audio.pause()
     }
 
+    /// Resumes play, unless the device is asleep (lid closed or app in the background): waking
+    /// resumes it then.
     func resume() {
+        guard sleepReasons.isEmpty else { return }
         session.send(.resume)
         audio.resume()
     }
+
+    // MARK: close-to-sleep
+
+    /// Why play is suspended. Closing the Duo and backgrounding the app both put the game to
+    /// sleep; it wakes only when every reason has gone.
+    enum SleepReason: Hashable { case lidClosed, background }
+    private(set) var sleepReasons: Set<SleepReason> = []
+    var isAsleepWithLidClosed: Bool { sleepReasons.contains(.lidClosed) }
+
+    /// Pauses emulation and audio, then writes the auto-save and the battery save (the first
+    /// reason only: once asleep nothing changes, so a second save would be the same state).
+    func sleep(_ reason: SleepReason) {
+        let wasAwake = sleepReasons.isEmpty
+        sleepReasons.insert(reason)
+        guard wasAwake else { return }
+        Self.log.info("sleep (\(String(describing: reason)))")
+        controller.releaseAll()
+        if fastForward { setFastForward(false) }
+        if rewinding { setRewind(false) }
+        pause()
+        // Keep the process alive until both files are on disk: iOS may suspend right after this.
+        let tracker = BackgroundSave(waitingFor: 2)
+        writeAutoState(completion: { tracker.finishOne() })
+        flushBattery(completion: { tracker.finishOne() })
+    }
+
+    /// Clears one reason; resumes exactly where play stopped once none are left (and the menu,
+    /// the layout editor and the controllers sheet are all closed).
+    func wake(_ reason: SleepReason) {
+        guard sleepReasons.remove(reason) != nil else { return }
+        guard sleepReasons.isEmpty else { return }
+        Self.log.info("wake (\(String(describing: reason)))")
+        if !menuOpen && editor == nil && !showingControllers { resume() }
+    }
+
+    nonisolated static let log = Logger(subsystem: "com.iqlabs.duoemulator", category: "player")
 
     func reset() {
         session.send(.reset)
@@ -199,26 +235,33 @@ final class PlayerModel {
 
     // MARK: saves
 
-    private func flushBattery() {
+    private func flushBattery(completion: (@MainActor @Sendable () -> Void)? = nil) {
         let url = store.batteryURL(for: game)
         let previous = lastBattery
         session.send(.battery { [weak self] data in
-            guard let data, data != previous else { return }
+            guard let data, data != previous else {
+                if let completion { Task { @MainActor in completion() } }
+                return
+            }
             try? data.write(to: url, options: .atomic)
             Task { @MainActor in
                 self?.lastBattery = data
                 self?.savingPulse += 1
+                completion?()
             }
         })
     }
 
-    func saveState(slot: Int) {
+    func saveState(slot: Int, completion: (@MainActor @Sendable () -> Void)? = nil) {
         let url = store.stateURL(for: game, slot: slot)
         let thumbURL = store.thumbnailURL(for: game, slot: slot)
         let thumb = currentThumbnail()
         let system = game.system, crc = romCRC, version = stateVersion
         session.send(.saveState { [weak self] payload in
-            guard let payload else { return }
+            guard let payload else {
+                if let completion { Task { @MainActor in completion() } }
+                return
+            }
             let data = StateContainer(system: system, coreStateVersion: version, romCRC: crc, payload: payload).encoded()
             try? data.write(to: url, options: .atomic)
             if let png = thumb { try? png.write(to: thumbURL, options: .atomic) }
@@ -226,6 +269,7 @@ final class PlayerModel {
                 self?.refreshSlots()
                 self?.savingPulse += 1
                 if slot != 0 { self?.show("Saved to slot \(slot)") }
+                completion?()
             }
         })
     }
@@ -256,9 +300,12 @@ final class PlayerModel {
         }
     }
 
-    private func writeAutoState() {
-        guard started, errorMessage == nil else { return }
-        saveState(slot: 0)
+    private func writeAutoState(completion: (@MainActor @Sendable () -> Void)? = nil) {
+        guard started, errorMessage == nil else {
+            completion?()
+            return
+        }
+        saveState(slot: 0, completion: completion)
     }
 
     private func resumeAutoState() {
@@ -337,5 +384,30 @@ final class PlayerModel {
             try? await Task.sleep(for: .seconds(2.2))
             if !Task.isCancelled { self?.toast = nil }
         }
+    }
+}
+
+/// Holds a background-task assertion until a number of saves have finished.
+@MainActor
+final class BackgroundSave {
+    private var outstanding: Int
+    private var task = UIBackgroundTaskIdentifier.invalid
+
+    init(waitingFor count: Int) {
+        outstanding = count
+        task = UIApplication.shared.beginBackgroundTask(withName: "Auto-save") { [weak self] in
+            MainActor.assumeIsolated { self?.end() }
+        }
+    }
+
+    func finishOne() {
+        outstanding -= 1
+        if outstanding <= 0 { end() }
+    }
+
+    private func end() {
+        guard task != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(task)
+        task = .invalid
     }
 }
