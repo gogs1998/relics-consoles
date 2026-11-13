@@ -76,7 +76,7 @@ Fable review changes in §10) and `docs/research.md` (App Store 4.7, core licens
 - `NESCore`: `NESSystem` (6502 where every bus access ticks PPU x3 + APU, so dummy reads give real timing;
   common unofficial opcodes), `PPU` (dot-based, loopy registers, sprite eval at 257, sprite-0 hit),
   `APU` (2 pulse, triangle, noise, DMC, frame counter, non-linear mixer), `Cartridge` (iNES/NES 2.0,
-  bank tables) + mappers 0, 1, 2, 3, 4, 7. Palette generated from a YIQ model (ours).
+  bank tables) + mappers 0, 1, 2, 3, 4, 7, 9, 10, 11, 66, 69 (FME-7 without 5B audio). Palette generated from a YIQ model (ours).
 - `GBCore` (helper-built, Fable-reviewed): `GBSystem` (SM83, timer, DMA/HDMA, double speed), `PPU`, `APU`,
   `Cartridge` (MBC1/2/3/5).
 - Multi-screen systems: `EmulatorCore.screens` (`ScreenRegion`s inside the framebuffer, `isTouch`) and
@@ -116,7 +116,8 @@ Fable review changes in §10) and `docs/research.md` (App Store 4.7, core licens
 `-holdStylus 128,96` (DS stylus held at that touch-screen pixel),
 `-openMenu YES`, `-freshStart YES` (ignore the auto-save), `-resetLayouts YES` (built-in touch layouts),
 `-keepTouchControls YES` (the simulator may expose a virtual "Gamepad", which hides the touch controller),
-`-fakeController YES` (pretend a pad is connected).
+`-fakeController YES` (pretend a pad is connected), `-lidCycle 3,8` (fake Duo close/open),
+`-editControls YES`, `-openSettings YES`.
 - Controls: `ControllerLayout` (presets: standard, 6-Button Arcade), `LayoutStore` (game → system → preset),
   `LayoutEditor` + `LayoutEditorArea` + `LayoutEditorPanel`; `GamepadHub` (GameController + keyboard, players,
   hotkeys via CoreKit `InputMapper`, remap capture), `ControllersSheet`, `ControllerCompanion`.

@@ -1,5 +1,41 @@
 # HANDOFF: Duo Emulator ("Foldback")
 
+## Update, 13 Nov 2026 (v1 feature batch: sleep, pose editor, table tray, RTC, mappers, zip, settings)
+Goal: v1 App Store-ready at £3.99 (NES, GB/GBC, GBA, SNES, MD, DS; N64 hidden until v2). Commits b21c34f..b8f3d87.
+- **Close-to-sleep (all systems):** `PlayerModel.sleep/wake(_:)` with reasons `.lidClosed` (DuoKit `stage.isClosed`,
+  the hinge's closed posture, never the angle) and `.background` (willResignActive / didBecomeActive). Sleep releases
+  touches, stops FF/rewind, pauses core + audio, writes the auto-state and battery under a background task
+  (`BackgroundSave`); wake resumes the in-memory session only when no reason is left and no menu/editor/sheet is open.
+  "Sleeping" veil while the lid is closed. DEBUG `-lidCycle 3,8` fakes a close/open.
+- **Pose-aware editor:** `LayoutPose` (table/book/portrait/landscape → areas); header says "Duo table layout" etc.;
+  "Copy from" another pose's saved layout through a shared unit space (`LayoutCopier`), real sizes when the file has the
+  new optional `SavedLayout.areaSize`. Header wraps on narrow book pages. DEBUG `-editControls YES`.
+- **Table pose bottom screen (one-screen systems):** `ControllerLayout.tableDeck` + `tableTray`: a recessed tray of
+  three quick slots with thumbnails along the hinge (tap empty = save, tap full = load with **Undo** in the toast,
+  hold = Save/Load menu), rewind/FF either side, L/R in the corners, menu key between Select and Start
+  (`QuickSlotTray.swift`). Only users without a saved table layout see the new defaults.
+- **GB fix 2 done:** MBC3 RTC follows the wall clock (pause/FF/rewind don't skew it), 48-byte VBA-M/BGB/mGBA footer
+  (44-byte read), states get an optional trailing `RTCW` stamp (clock carts only; old states still load) so loading
+  catches up real time.
+- **NES mappers 9, 10, 11, 66, 69** (`NESCore/Cartridge.swift`) with our own probes (`TestROMs/nes/mappers.py` →
+  `mmc2/mmc4/colordreams/gxrom/fme7_probe.nes`). FME-7's 5B sound chip is **not** emulated (Gimmick! etc. lose music).
+- **Zip import:** `CoreKit/ZipArchive` (Apple Compression, raw DEFLATE; stored/deflate; CRC/size checked; streams to a
+  temp file). One game per zip; none/several/Zip64/encrypted refused with a message. Picker accepts .zip; Inbox too.
+  Not added as a CFBundleDocumentType (no "Open in" for zips yet). Import runs on the main thread (a big zip blocks UI briefly).
+- **Settings** (shelf gear + pause menu): haptics, game volume, default screen filter (resets per-system picks),
+  FF speed 2/3/4/8x, auto-save (off = no auto-state and the old one is deleted; battery saves always kept).
+  `AppSettings.swift`, `SettingsView.swift`. DEBUG `-openSettings YES`.
+- **Tests:** CoreKit 101 pass (new: RTC wall clock/state/footer/paused-time, 5 mapper probes + state determinism +
+  FME-7 counter, zip). App unit tests 29 pass (copier, table tray clearance, zip import, settings). Release device
+  build zero warnings. **Fable review:** 2 must-fixes (stale auto-state rolling back battery saves when auto-save is
+  toggled; RTC losing paused time) + 7 shoulds, all applied in b8f3d87.
+- **Simulator only** (Shared iPhone 17e, reused; 3 sims were booted): shots `docs/shots/table-sleep.png`,
+  `editor-table-pose.png`, `editor-book-pose.png`, `book-nes.png`, `table-nes-quickslots.png`,
+  `table-gba-quickslots.png`, `table-fme7-probe.png`, `iphone-settings.png`. **Needs Gordon's Duo/device:** real
+  fold-to-sleep (does iOS report `.closed` before backgrounding?), haptics/volume/audio, tray reach under thumbs.
+
+---
+
 ## Update, 13 Nov 2026 (N64 RDP spike: paraLLEl-RDP + MoltenVK + cxd4, throwaway)
 - **Findings: `docs/n64-rdp-spike.md`.** M4 Mac mini, our own bench ROM (`Spikes/N64RDP/rom/`): busy load (2,000
   textured Z-buffered tris, 2x fill, our RSP microcode) **153 fps** synchronous, stress load (4,000 tris, 3x fill)
@@ -278,7 +314,7 @@ from it at the end. D8C4096C was never touched.
 
 ## Known gaps and next steps
 - GB review: fixes 1 (EI;HALT halt bug) and 3 (lines redrawn at the end of mode 3) are applied; **fix 2
-  is still open**: the MBC3 real-time clock doesn't tick or persist (affects clock-based games). Per-pixel
+  is done (13 Nov 2026 batch). Per-pixel
   mid-line effects are still not modelled. NES: no PAL, no
   mappers beyond 0/1/2/3/4/7 (add 9/10/11/66/69 next), sprite overflow bug not modelled, DMC DMA timing
   approximate, MMC3 IRQ uses the dot-260 approximation rather than watching A12.
