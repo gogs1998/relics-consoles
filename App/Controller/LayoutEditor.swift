@@ -325,25 +325,17 @@ struct LayoutEditorPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Edit controls")
-                        .font(.rounded(.headline, weight: .heavy))
-                        .foregroundStyle(Theme.ink)
-                    Label("\(editor.pose.title) layout", systemImage: editor.pose.symbol)
-                        .font(.rounded(.caption, weight: .semibold))
-                        .foregroundStyle(Theme.ember)
-                        .accessibilityLabel("Editing the \(editor.pose.title) layout")
-                        .accessibilityIdentifier("edit.pose")
+            // Narrow book pages: the buttons get their own row above the title.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    titleBlock
+                    Spacer(minLength: 4)
+                    headerButtons
                 }
-                Spacer(minLength: 4)
-                Button("Cancel", action: onCancel).buttonStyle(ChipStyle(selected: false))
-                Button {
-                    editor.save()
-                    onDone()
-                } label: { Label("Done", systemImage: "checkmark") }
-                .buttonStyle(EmberButtonStyle())
-                .accessibilityIdentifier("edit.done")
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) { headerButtons }
+                    titleBlock
+                }
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -413,6 +405,34 @@ struct LayoutEditorPanel: View {
                 editor.message = "That file isn't a Relics Games layout"
             }
         }
+    }
+
+    private var titleBlock: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text("Edit controls")
+                .font(.rounded(.headline, weight: .heavy))
+                .foregroundStyle(Theme.ink)
+                .fixedSize()
+            Label("\(editor.pose.title) layout", systemImage: editor.pose.symbol)
+                .font(.rounded(.caption, weight: .semibold))
+                .foregroundStyle(Theme.ember)
+                .fixedSize()
+                .accessibilityLabel("Editing the \(editor.pose.title) layout")
+                .accessibilityIdentifier("edit.pose")
+        }
+    }
+
+    @ViewBuilder private var headerButtons: some View {
+        Button("Cancel", action: onCancel)
+            .buttonStyle(ChipStyle(selected: false))
+            .fixedSize()
+        Button {
+            editor.save()
+            onDone()
+        } label: { Label("Done", systemImage: "checkmark") }
+        .buttonStyle(EmberButtonStyle())
+        .fixedSize()
+        .accessibilityIdentifier("edit.done")
     }
 
     private func selectedControls(_ c: Control) -> some View {
