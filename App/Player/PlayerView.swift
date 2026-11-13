@@ -145,6 +145,7 @@ struct PlayerView: View {
         let bottom = stage.nearHalf
         let bezel = top.insetBy(dx: 14, dy: 12)
         let deck = bottom.insetBy(dx: 8, dy: 6)
+        let system = model.game.system, six = model.sixButtonPad
         return ZStack(alignment: .topLeading) {
             screen(in: bezel)
             HingeSeam(axis: .horizontal).place(stage.fold.frame)
@@ -153,8 +154,16 @@ struct PlayerView: View {
                 // rewind / fast-forward, the menu and who's playing. (Spreading the game across
                 // both halves would put the hinge through the picture.)
                 ControllerCompanion(model: model, onQuit: onQuit).place(deck)
-            } else {
+            } else if system == .n64 {
                 deckBody(in: deck, area: .table)
+            } else {
+                // The spare room around the controller: quick slots with thumbnails along the
+                // hinge, rewind and fast-forward either side, the menu key between Select and Start.
+                let tray = ControllerLayout.tableTray(deck.size, shoulders: ControllerLayout.hasShoulders(system))
+                deckBody(in: deck, area: .table, avoiding: tray) { size, preset in
+                    ControllerLayout.tableDeck(size, system: system, sixButton: six, preset: preset)
+                }
+                QuickSlotTray(model: model).place(tray.offsetBy(dx: deck.minX, dy: deck.minY))
             }
             if model.menuOpen { menuPanel.place(bottom.insetBy(dx: 10, dy: 8)) }
             if model.editor != nil { editorPanel.place(top.insetBy(dx: 10, dy: 8)) }
@@ -264,13 +273,14 @@ struct PlayerView: View {
         .place(rect)
     }
 
-    private func deckBody(in rect: CGRect, area: ControllerArea) -> some View {
+    private func deckBody(in rect: CGRect, area: ControllerArea, avoiding: CGRect? = nil,
+                          layout: ((CGSize, LayoutPreset) -> [Control])? = nil) -> some View {
         let system = model.game.system, six = model.sixButtonPad, size = rect.size
         return ZStack(alignment: .topLeading) {
             VentSlots(columns: 5)
                 .position(x: rect.width * 0.86, y: rect.height * 0.88)
-            controllerArea(area, rect: CGRect(origin: .zero, size: size)) {
-                ControllerLayout.deck(size, system: system, sixButton: six, preset: $0)
+            controllerArea(area, rect: CGRect(origin: .zero, size: size), avoiding: avoiding) {
+                layout?(size, $0) ?? ControllerLayout.deck(size, system: system, sixButton: six, preset: $0)
             }
         }
         .place(rect)
@@ -306,9 +316,18 @@ struct PlayerView: View {
 
     @ViewBuilder var toastView: some View {
         if let toast = model.toast {
-            Text(toast)
-                .font(.rounded(.footnote, weight: .semibold))
-                .foregroundStyle(Theme.ink)
+            HStack(spacing: 10) {
+                Text(toast)
+                    .font(.rounded(.footnote, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+                if model.toastOffersUndo {
+                    Button("Undo") { model.undoQuickLoad() }
+                        .font(.rounded(.footnote, weight: .heavy))
+                        .foregroundStyle(Theme.ember)
+                        .accessibilityLabel("Undo the load")
+                        .accessibilityIdentifier("toast.undo")
+                }
+            }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
                 .background(.ultraThinMaterial, in: Capsule())

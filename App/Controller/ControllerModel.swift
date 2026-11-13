@@ -394,16 +394,17 @@ enum ControllerLayout {
     }
 
     /// The full handheld controller (Duo table pose bottom half, or below the game in portrait).
-    static func deck(_ size: CGSize, system: SystemID, sixButton: Bool = false, preset: LayoutPreset = .standard) -> [Control] {
+    static func deck(_ size: CGSize, system: SystemID, sixButton: Bool = false, preset: LayoutPreset = .standard,
+                     shoulders withShoulders: Bool = true, keys: Bool = true) -> [Control] {
         if system == .n64 { return N64Layout.deck(size) }
         let w = size.width, h = size.height
-        let shoulderSpace: CGFloat = hasShoulders(system, preset: preset) ? 40 : 0
+        let shoulderSpace: CGFloat = withShoulders && hasShoulders(system, preset: preset) ? 40 : 0
         let usableH = h - shoulderSpace
         let unit = min(w / 2.6, usableH * 0.62)
         let dpad = unit * 0.92
         let face = unit * (system == .snes || system == .ds || system == .md ? 0.36 : 0.40)
         let midY = shoulderSpace + usableH * 0.50
-        var c: [Control] = hasShoulders(system, preset: preset) ? shoulders(system, width: w, top: 4) : []
+        var c: [Control] = shoulderSpace > 0 ? shoulders(system, width: w, top: 4) : []
         c.append(Control(kind: .dpad, frame: CGRect(x: w * 0.23 - dpad / 2, y: midY - dpad / 2, width: dpad, height: dpad)))
         if preset == .arcade {
             let d = min(unit * 0.34, w * 0.11)
@@ -422,11 +423,55 @@ enum ControllerLayout {
         }
         c.append(Control(kind: .pill(.start, "START"), frame: CGRect(x: w * 0.5 + 10, y: pillY, width: pillW, height: pillH)))
         let key: CGFloat = min(38, h * 0.14)
+        guard keys else {
+            // Rewind and fast-forward live elsewhere (the table rail): the menu key sits above the pills.
+            let k = min(38, h * 0.16)
+            c.append(Control(kind: .menu, frame: CGRect(x: w * 0.5 - k / 2, y: max(4, pillY - k - 10), width: k, height: k)))
+            return c
+        }
         let keyY = max(shoulderSpace + 8, midY - dpad * 0.5 - 4)
         c.append(Control(kind: .rewind, frame: CGRect(x: w * 0.5 - key * 1.9, y: keyY, width: key, height: key)))
         c.append(Control(kind: .menu, frame: CGRect(x: w * 0.5 - key / 2, y: keyY, width: key, height: key)))
         c.append(Control(kind: .fastForward, frame: CGRect(x: w * 0.5 + key * 0.9, y: keyY, width: key, height: key)))
         return c
+    }
+
+    /// Duo table pose, one-screen systems: the bottom half's top rail holds the quick-slot tray
+    /// (`tableTray`) flanked by rewind and fast-forward, with the shoulders at the corners; the
+    /// controller fills the rest, with the menu key between Select and Start.
+    static func tableDeck(_ size: CGSize, system: SystemID, sixButton: Bool = false, preset: LayoutPreset = .standard) -> [Control] {
+        let w = size.width, h = size.height
+        let rail = tableRailHeight(size)
+        let withShoulders = hasShoulders(system, preset: preset)
+        let tray = tableTray(size, shoulders: hasShoulders(system))   // preset-independent, as the view draws it
+        let key = tableRailKey(size)
+        let keyY = tray.midY - key / 2
+        var c: [Control] = []
+        c.append(Control(kind: .rewind, frame: CGRect(x: tray.minX - key - 12, y: keyY, width: key, height: key)))
+        c.append(Control(kind: .fastForward, frame: CGRect(x: tray.maxX + 12, y: keyY, width: key, height: key)))
+        if withShoulders {
+            let sw = min(132, tray.minX - key - 12 - 10 - 8)
+            c.append(Control(kind: .shoulder(.l, "L"), frame: CGRect(x: 8, y: 6, width: sw, height: 30)))
+            c.append(Control(kind: .shoulder(.r, "R"), frame: CGRect(x: w - 8 - sw, y: 6, width: sw, height: 30)))
+        }
+        let lower = deck(CGSize(width: w, height: h - rail), system: system, sixButton: sixButton, preset: preset,
+                         shoulders: false, keys: false)
+        c += lower.map { var m = $0; m.frame.origin.y += rail; return m }
+        return c
+    }
+
+    static func tableRailHeight(_ size: CGSize) -> CGFloat { min(130, max(58, size.height * 0.27)) }
+
+    static func tableRailKey(_ size: CGSize) -> CGFloat { min(42, tableRailHeight(size) * 0.62) }
+
+    /// The quick-slot tray in the table deck (area coordinates): centred along the hinge edge,
+    /// narrower when L and R need the corners (each keeps at least 56 pt beside the rail keys).
+    static func tableTray(_ size: CGSize, shoulders: Bool = false) -> CGRect {
+        let rail = tableRailHeight(size)
+        let th = rail - 12
+        var tw = min(size.width * 0.44, th * 3.9)
+        if shoulders { tw = min(tw, size.width - 2 * (8 + 56 + 10 + tableRailKey(size) + 12)) }
+        return CGRect(x: (size.width - tw) / 2, y: 6, width: tw, height: th)
     }
 
     /// Book pose, left page: the D-pad under the game (and L).

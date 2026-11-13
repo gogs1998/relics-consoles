@@ -274,7 +274,7 @@ final class PlayerModel {
         })
     }
 
-    func loadState(slot: Int) {
+    func loadState(slot: Int, offerUndo: Bool = false) {
         guard let data = try? Data(contentsOf: store.stateURL(for: game, slot: slot)) else {
             show("Slot \(slot) is empty")
             return
@@ -291,7 +291,9 @@ final class PlayerModel {
             }
             session.send(.loadState(c.payload) { [weak self] error in
                 Task { @MainActor in
-                    self?.show(error ?? (slot == 0 ? "Resumed where you left off" : "Loaded slot \(slot)"))
+                    if let error { self?.show(error) } else {
+                        self?.show(slot == 0 ? "Resumed where you left off" : "Loaded slot \(slot)", undo: offerUndo)
+                    }
                 }
             })
             menuOpen = false
@@ -383,12 +385,38 @@ final class PlayerModel {
         return UIImage(cgImage: image).pngData()
     }
 
-    func show(_ message: String) {
+    /// The toast carries an Undo for the last quick load.
+    private(set) var toastOffersUndo = false
+    @ObservationIgnored private var undoState: Data?
+
+    /// A quick-slot load from the table tray: the current moment is kept first, so a mistaken tap
+    /// can be undone from the toast.
+    func quickLoad(slot: Int) {
+        guard FileManager.default.fileExists(atPath: store.stateURL(for: game, slot: slot).path) else {
+            show("Slot \(slot) is empty")
+            return
+        }
+        session.send(.saveState { [weak self] payload in
+            Task { @MainActor in self?.undoState = payload }
+        })
+        loadState(slot: slot, offerUndo: true)
+    }
+
+    func undoQuickLoad() {
+        guard let undo = undoState else { return }
+        undoState = nil
+        session.send(.loadState(undo) { [weak self] error in
+            Task { @MainActor in self?.show(error ?? "Back to where you were") }
+        })
+    }
+
+    func show(_ message: String, undo: Bool = false) {
         toast = message
+        toastOffersUndo = undo
         toastTask?.cancel()
         toastTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(2.2))
-            if !Task.isCancelled { self?.toast = nil }
+            try? await Task.sleep(for: .seconds(undo ? 4 : 2.2))
+            if !Task.isCancelled { self?.toast = nil; self?.toastOffersUndo = false }
         }
     }
 }

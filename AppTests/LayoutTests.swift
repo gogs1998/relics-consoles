@@ -139,3 +139,22 @@ import Testing
         }
     }
 }
+
+/// Duo table pose, one-screen systems: the quick-slot tray along the hinge stays clear.
+@MainActor
+@Suite struct TableDeckTests {
+    @Test(arguments: [SystemID.nes, .gb, .gbc, .gba, .snes, .md])
+    func nothingCoversTheTray(_ system: SystemID) {
+        for size in [CGSize(width: 386, height: 253), CGSize(width: 653, height: 437)] {
+            for preset in LayoutPreset.available(for: system) {
+                let tray = ControllerLayout.tableTray(size, shoulders: ControllerLayout.hasShoulders(system))
+                let controls = ControllerLayout.tableDeck(size, system: system, preset: preset)
+                #expect(controls.contains { $0.kind == .rewind } && controls.contains { $0.kind == .menu })
+                for c in controls {
+                    #expect(!c.frame.intersects(tray), "\(system) \(preset) \(c.id) covers the tray")
+                    #expect(CGRect(origin: .zero, size: size).insetBy(dx: -0.5, dy: -0.5).contains(c.frame), "\(c.id) outside")
+                }
+            }
+        }
+    }
+}
