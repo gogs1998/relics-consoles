@@ -23,7 +23,7 @@ Fable review changes in §10) and `docs/research.md` (App Store 4.7, core licens
   our front end/plugins/shims in `glue`, patches would go in `ThirdParty/mupen64/patches/`). **GLideN64 is GPL-2.0-only
   (no "or later") and must not be vendored** (`ThirdParty/mupen64/README.md`). Licence texts: `Licenses/` (repo) and
   `App/Resources/Licences/` (shown in About). Keep both in sync when a component is added.
-- **Core plan:** N64 (mupen64plus + rsp-hle; the RDP renderer is still open, GLideN64 is out on licence) and DS (melonDS, own FreeBIOS) first, then PS1
+- **Core plan:** N64 (mupen64plus + rsp-hle + cxd4 RSP, paraLLEl-RDP on MoltenVK, in the first release if Gordon's own games pass on TestFlight; GLideN64 is out on licence) and DS (melonDS, own FreeBIOS) first, then PS1
   (PCSX-ReARMed, HLE BIOS), PSP (PPSSPP, no JIT), then small systems (Mednafen, Stella). GameCube/Wii is a
   post-v1 goal (`docs/gamecube-wii-feasibility.md`). Upstream sources are cloned into `ThirdParty-src/` (gitignored).
   Systems needing a BIOS must use an HLE/free replacement; never ship or point to Nintendo/Sony firmware.
@@ -89,8 +89,9 @@ Fable review changes in §10) and `docs/research.md` (App Store 4.7, core licens
 - `N64Core`: `N64System` over `Sources/MUPEN64/glue` (C API `Mupen64Glue.h`). The core's own loop runs on a private
   thread parked at every vertical interrupt (inside our video plugin's UpdateScreen); plugins linked statically via
   our `osal_dynlib_getproc` tables (rsp-hle renamed `rsphle_*` by `glue/units`); cached interpreter, HLE boot,
-  `RandomizeInterrupt` off. Video = VI scan-out of RDRAM to 320x240 (no RDP renderer yet: commercial games' graphics
-  don't show). Audio: AI samples → linear resample to 48 kHz mono in the glue (the Decimator can't upsample).
+  `RandomizeInterrupt` off. Video = paraLLEl-RDP (MIT) on MoltenVK (Apache-2.0, device only), async, 640x480 VI into our
+  Metal renderer, persistent VkPipelineCache in Application Support; simulator/Mac tests fall back to VI scan-out of RDRAM.
+  No rewind for N64. `glue/rdp/` holds the RDP glue, cxd4 unit and pipeline cache. See docs/n64-rdp-spike.md. Audio: AI samples → linear resample to 48 kHz mono in the glue (the Decimator can't upsample).
   Input: `InputState` gained `.z`, `.cUp/.cDown/.cLeft/.cRight`; the stick is `EmulatorCore.setAnalog(_:player:)`
   (`AnalogStick`, defaulted no-op) fed from `InputLatch.touchStick/padStick/player2Stick`. States = mupen64plus's
   gzip savestate (taken at the frame boundary); battery = "N64B" blob of the EEPROM/SRAM/FlashRAM/Controller Pak
