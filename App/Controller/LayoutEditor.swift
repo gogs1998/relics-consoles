@@ -19,6 +19,8 @@ final class LayoutEditor {
 
     private(set) var controls: [ControllerArea: [Control]] = [:]
     private(set) var sizes: [ControllerArea: CGSize] = [:]
+    /// Per area, a rect no control may overlap (the game, when controls share its area: landscape).
+    private(set) var avoid: [ControllerArea: CGRect] = [:]
     @ObservationIgnored private var defaults: [ControllerArea: (LayoutPreset) -> [Control]] = [:]
     var selection: (area: ControllerArea, id: String)?
     var message: String?
@@ -33,8 +35,10 @@ final class LayoutEditor {
     }
 
     /// Called by each area's editor view when it appears (and when its size changes).
-    func register(_ area: ControllerArea, size: CGSize, defaults make: @escaping (LayoutPreset) -> [Control]) {
+    func register(_ area: ControllerArea, size: CGSize, avoiding: CGRect? = nil,
+                  defaults make: @escaping (LayoutPreset) -> [Control]) {
         defaults[area] = make
+        avoid[area] = avoiding
         if let old = sizes[area], let list = controls[area] {
             // A size change (rotation, multitasking): keep the unsaved edits, rescaled.
             guard old != size, old.width > 0, old.height > 0 else { return }
@@ -58,9 +62,29 @@ final class LayoutEditor {
 
     private func update(_ area: ControllerArea, _ id: String, _ change: (inout Control) -> Void) {
         guard var list = controls[area], let i = list.firstIndex(where: { $0.id == id }) else { return }
+        let before = list[i].frame
         change(&list[i])
         list[i].frame = clamp(list[i].frame, in: sizes[area] ?? .zero)
+        if let keepOut = avoid[area], list[i].frame.intersects(keepOut) {
+            list[i].frame = pushedOut(list[i].frame, from: keepOut, in: sizes[area] ?? .zero) ?? before
+        }
         controls[area] = list
+    }
+
+    /// Moves `r` sideways off `keepOut` (to the nearer side), or nil if it doesn't fit there.
+    private func pushedOut(_ r: CGRect, from keepOut: CGRect, in size: CGSize) -> CGRect? {
+        var f = r
+        let leftRoom = keepOut.minX, rightRoom = size.width - keepOut.maxX
+        if r.midX < keepOut.midX, r.width <= leftRoom {
+            f.origin.x = keepOut.minX - r.width
+        } else if r.width <= rightRoom {
+            f.origin.x = keepOut.maxX
+        } else if r.width <= leftRoom {
+            f.origin.x = keepOut.minX - r.width
+        } else {
+            return nil
+        }
+        return f.intersects(keepOut) ? nil : f
     }
 
     private func clamp(_ r: CGRect, in size: CGSize) -> CGRect {
@@ -154,6 +178,8 @@ struct LayoutEditorArea: View {
     let model: ControllerModel
     let area: ControllerArea
     let size: CGSize
+    /// The game's rect inside this area, when the area surrounds the game (landscape).
+    var avoiding: CGRect?
     let defaults: (LayoutPreset) -> [Control]
 
     @State private var dragStart: [String: CGPoint] = [:]
@@ -180,7 +206,7 @@ struct LayoutEditorArea: View {
             }
             ForEach(editor.controls[area] ?? []) { c in
                 let isSelected = editor.selection?.area == area && editor.selection?.id == c.id
-                ControlArt(control: c, model: model)
+                ControlArt(control: c, model: model, outerRing: editor.settings.stickOuterRing)
                     .frame(width: c.frame.width, height: c.frame.height)
                     .opacity(c.isHidden ? 0.15 : max(0.25, c.opacity))
                     .overlay(
@@ -207,8 +233,8 @@ struct LayoutEditorArea: View {
             }
         }
         .frame(width: size.width, height: size.height)
-        .onAppear { editor.register(area, size: size, defaults: defaults) }
-        .onChange(of: size) { _, new in editor.register(area, size: new, defaults: defaults) }
+        .onAppear { editor.register(area, size: size, avoiding: avoiding, defaults: defaults) }
+        .onChange(of: size) { _, new in editor.register(area, size: new, avoiding: avoiding, defaults: defaults) }
     }
 
     private func drag(_ c: Control) -> some Gesture {
@@ -236,13 +262,14 @@ struct LayoutEditorArea: View {
     private func name(_ c: Control) -> String {
         switch c.kind {
         case .dpad: "direction pad"
-        case .face(_, let l, _): "\(l) button"
+        case .face(_, let l, _): FaceButtonView.spoken(l)
         case .pill(_, let l): l.capitalized
         case .shoulder(_, let l): "\(l) shoulder"
         case .combo(_, let l): l == "AB" ? "A and B zone" : "row zone"
         case .menu: "menu key"
         case .fastForward: "fast-forward key"
         case .rewind: "rewind key"
+        case .stick: "analog stick"
         }
     }
 }
@@ -377,6 +404,40 @@ struct LayoutEditorPanel: View {
                 .pickerStyle(.segmented)
             }
             slider("Haptics (all)", value: Binding(get: { editor.settings.hapticLevel }, set: { editor.settings.hapticLevel = $0 }), range: 0...1)
+            if editor.system == .n64 { stickSettings }
+        }
+    }
+
+    /// The analog stick's tuning (Nintendo 64): true analog always; these shape it.
+    private var stickSettings: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Analog stick").font(.rounded(.subheadline, weight: .heavy)).foregroundStyle(Theme.ink)
+                .padding(.top, 4)
+            // Sensitivity: how far the thumb travels for full deflection (shown so right = more sensitive).
+            slider("Sensitivity", value: Binding(get: { 1.4 - editor.settings.stickRange },
+                                                 set: { editor.settings.stickRange = 1.4 - $0 }), range: 0.4...1.0)
+                .accessibilityIdentifier("edit.stickSensitivity")
+                .accessibilityValue("Full tilt at \(Int((editor.settings.stickRange * 100).rounded())) percent of the stick")
+            slider("Dead zone", value: Binding(get: { editor.settings.stickDeadZone },
+                                               set: { editor.settings.stickDeadZone = $0 }), range: 0...0.4)
+                .accessibilityIdentifier("edit.stickDeadZone")
+                .accessibilityValue("\(Int((editor.settings.stickDeadZone * 100).rounded())) percent")
+            Toggle(isOn: Binding(get: { editor.settings.stickOuterRing }, set: { editor.settings.stickOuterRing = $0 })) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Outer ring").font(.rounded(.footnote, weight: .semibold)).foregroundStyle(Theme.ink)
+                    Text("Touching the ring is always full tilt").font(.rounded(.caption2)).foregroundStyle(Theme.inkDim)
+                }
+            }
+            .tint(Theme.ember)
+            .accessibilityIdentifier("edit.stickRing")
+            Toggle(isOn: Binding(get: { editor.settings.stickRecentre }, set: { editor.settings.stickRecentre = $0 })) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Centre where I touch").font(.rounded(.footnote, weight: .semibold)).foregroundStyle(Theme.ink)
+                    Text("The stick starts under your thumb").font(.rounded(.caption2)).foregroundStyle(Theme.inkDim)
+                }
+            }
+            .tint(Theme.ember)
+            .accessibilityIdentifier("edit.stickRecentre")
         }
     }
 

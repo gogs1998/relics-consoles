@@ -74,6 +74,15 @@ struct PlayerView: View {
                 .accessibilityValue("\(model.controller.everPressed.rawValue)")
                 .allowsHitTesting(false)
         }
+        .overlay(alignment: .bottom) {
+            let p = model.controller.stickPeak
+            Text("stick \(String(format: "%.2f %.2f", p.x, p.y))")
+                .font(.caption2)
+                .opacity(0.01)
+                .accessibilityIdentifier("debug.stick")
+                .accessibilityValue(String(format: "%.2f %.2f", p.x, p.y))
+                .allowsHitTesting(false)
+        }
         .overlay(alignment: .bottomLeading) {
             Text("stylus \(model.stylusDebug)")
                 .font(.caption2)
@@ -172,9 +181,12 @@ struct PlayerView: View {
         return ZStack(alignment: .topLeading) {
             GameScreen(frames: model.session.frames, mode: mode, integer: fit.integer)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
+                .accessibilityElement()
+                .accessibilityLabel("Game screen")
+                .accessibilityIdentifier("game.screen")
                 .place(game)
             if !physical {
-                controllerArea(.landscape, rect: c) {
+                controllerArea(.landscape, rect: c, avoiding: gameInArea) {
                     ControllerLayout.overlay(c.size, gameRect: gameInArea, system: system, sixButton: six, preset: $0)
                 }
             }
@@ -223,10 +235,11 @@ struct PlayerView: View {
     /// The touch controller for one area: the saved layout (game, then system), or the preset's
     /// defaults; in edit mode, the editor for that area instead.
     @ViewBuilder
-    func controllerArea(_ area: ControllerArea, rect: CGRect,
+    func controllerArea(_ area: ControllerArea, rect: CGRect, avoiding: CGRect? = nil,
                                 defaults: @escaping (LayoutPreset) -> [Control]) -> some View {
         if let editor = model.editor {
-            LayoutEditorArea(editor: editor, model: model.controller, area: area, size: rect.size, defaults: defaults)
+            LayoutEditorArea(editor: editor, model: model.controller, area: area, size: rect.size, avoiding: avoiding,
+                             defaults: defaults)
                 .place(rect)
         } else {
             let r = model.layouts.controls(model.game.system, area, game: model.game.id, size: rect.size, defaults: defaults)
@@ -314,6 +327,9 @@ struct ScreenBezel<Overlay: View>: View {
                 ZStack {
                     GameScreen(frames: model.session.frames, mode: model.screenMode, integer: fit.integer)
                         .frame(width: fit.size.width, height: fit.size.height)
+                        .accessibilityElement()
+                        .accessibilityLabel("Game screen")
+                        .accessibilityIdentifier("game.screen")
                     // A faint glass sheen across the top of the screen.
                     LinearGradient(colors: [Color.white.opacity(0.05), .clear], startPoint: .top, endPoint: .center)
                         .frame(width: fit.size.width, height: fit.size.height)

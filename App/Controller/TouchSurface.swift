@@ -32,7 +32,7 @@ struct TouchSurface: UIViewRepresentable {
         var controls: [Control] = []
         weak var model: ControllerModel?
 
-        private enum Owner { case dpad, buttons, pill(InputState), menu, fastForward, rewind, none }
+        private enum Owner { case dpad, buttons, pill(InputState), menu, fastForward, rewind, stick(CGPoint), none }
         private var owners: [ObjectIdentifier: Owner] = [:]
         private var points: [ObjectIdentifier: CGPoint] = [:]
 
@@ -51,6 +51,11 @@ struct TouchSurface: UIViewRepresentable {
                 let id = ObjectIdentifier(t)
                 points[id] = p
                 owners[id] = owner(at: p)
+                if case .stick = owners[id] {
+                    // One thumb on the stick at a time; a second touch there does nothing.
+                    let taken = owners.contains { key, o in if case .stick = o, key != id { true } else { false } }
+                    owners[id] = taken ? Owner.none : .stick(stickOrigin(for: p))
+                }
             }
             recompute()
         }
@@ -83,13 +88,37 @@ struct TouchSurface: UIViewRepresentable {
             MainActor.assumeIsolated { model?.releaseAll() }
         }
 
+        private var stickControl: Control? { controls.first { $0.kind == .stick } }
+        private var stickSettings: ControlSettings { MainActor.assumeIsolated { model?.settings ?? ControlSettings() } }
+
+        /// Where the stick's centre is for a thumb landing at `p`: the control's centre, or the
+        /// thumb itself when re-centring is on (except on the outer ring, which is always measured
+        /// from the real centre so it gives full deflection).
+        private func stickOrigin(for p: CGPoint) -> CGPoint {
+            guard let c = stickControl else { return p }
+            let centre = CGPoint(x: c.frame.midX, y: c.frame.midY)
+            let onBase = hypot(p.x - centre.x, p.y - centre.y) <= c.frame.width / 2
+            return stickSettings.stickRecentre && onBase ? p : centre
+        }
+
+        /// The stick's touch area: its frame plus a little; out to the outer ring when that's on.
+        private func stickHit(_ c: Control, _ p: CGPoint) -> Bool {
+            let ring = stickSettings.stickOuterRing ? StickMath.ringScale : 1.12
+            return hypot(p.x - c.frame.midX, p.y - c.frame.midY) <= c.frame.width / 2 * ring
+        }
+
         private func owner(at p: CGPoint) -> Owner {
             // Exact frames first, then the generous hit areas.
             for pass in 0..<2 {
                 for c in controls {
+                    if c.kind == .stick {
+                        if pass == 1 && stickHit(c, p) || pass == 0 && c.frame.contains(p) { return .stick(.zero) }
+                        continue
+                    }
                     let r = pass == 0 ? c.frame : c.hitFrame
                     guard r.contains(p) else { continue }
                     switch c.kind {
+                    case .stick: return .stick(.zero)
                     case .dpad: return .dpad
                     case .face, .shoulder, .combo: return .buttons
                     case .pill(let s, _): return .pill(s)
@@ -106,6 +135,7 @@ struct TouchSurface: UIViewRepresentable {
             var pressed: InputState = []
             var vector = CGVector.zero
             var menu = false, ff = false, rewind = false
+            var stick = AnalogStick.centre, knob = CGVector.zero, base = CGVector.zero
             for (id, owner) in owners {
                 guard let p = points[id] else { continue }
                 switch owner {
@@ -135,6 +165,15 @@ struct TouchSurface: UIViewRepresentable {
                        c.hitFrame.insetBy(dx: -20, dy: -20).contains(p) {
                         pressed.insert(s)
                     }
+                case .stick(let origin):
+                    guard let c = stickControl else { break }
+                    let st = stickSettings
+                    let centre = CGPoint(x: c.frame.midX, y: c.frame.midY)
+                    let radius = c.frame.width / 2
+                    stick = StickMath.value(thumb: p, origin: origin, radius: radius, range: st.stickRange,
+                                            deadZone: st.stickDeadZone)
+                    base = CGVector(dx: origin.x - centre.x, dy: origin.y - centre.y)
+                    knob = StickMath.knob(thumb: p, origin: origin, radius: radius)
                 case .menu: menu = true
                 case .fastForward: ff = true
                 case .rewind: rewind = true
@@ -142,6 +181,7 @@ struct TouchSurface: UIViewRepresentable {
                 }
             }
             MainActor.assumeIsolated {
+                model?.updateStick(stick, knob: knob, base: base)
                 model?.update(pressed: pressed, dpad: vector, menu: menu, fastForward: ff, rewind: rewind)
             }
         }
@@ -175,5 +215,36 @@ struct TouchSurface: UIViewRepresentable {
             let v = CGVector(dx: dx / dist, dy: dy / dist)
             return (s, v)
         }
+    }
+}
+
+/// The touch stick's maths (pure, so it can be unit-tested).
+///
+/// True analog: the output points exactly at the thumb, never snapped to 8 or 45 degrees. Its
+/// magnitude reaches 1 at `range` x the stick's radius (lower = more sensitive) and is 0 inside the
+/// dead zone, rescaled so it rises smoothly from the dead zone's edge.
+enum StickMath {
+    /// The outer ring's radius as a multiple of the stick's.
+    static let ringScale: CGFloat = 1.45
+
+    static func value(thumb p: CGPoint, origin: CGPoint, radius: CGFloat, range: Double, deadZone: Double) -> AnalogStick {
+        let dx = Double(p.x - origin.x), dy = Double(origin.y - p.y)   // up is positive
+        let dist = (dx * dx + dy * dy).squareRoot()
+        let full = Double(radius) * min(1, max(0.2, range))
+        guard dist > 0, full > 0 else { return .centre }
+        let m = min(1, dist / full)
+        let zone = min(0.9, max(0, deadZone))
+        guard m > zone else { return .centre }
+        let shaped = (m - zone) / (1 - zone)
+        return AnalogStick(x: dx / dist * shaped, y: dy / dist * shaped)
+    }
+
+    /// Where to draw the knob: under the thumb, held inside the base.
+    static func knob(thumb p: CGPoint, origin: CGPoint, radius: CGFloat) -> CGVector {
+        let dx = p.x - origin.x, dy = p.y - origin.y
+        let dist = hypot(dx, dy)
+        let limit = radius * 0.62
+        guard dist > limit, dist > 0 else { return CGVector(dx: dx, dy: dy) }
+        return CGVector(dx: dx / dist * limit, dy: dy / dist * limit)
     }
 }

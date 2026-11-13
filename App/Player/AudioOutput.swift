@@ -91,6 +91,8 @@ final class AudioOutput {
     func pause() { engine.pause() }
 
     func resume() {
-        if !engine.isRunning { try? engine.start() }
+        // Only once the graph exists: starting an engine with no source node raises an Objective-C
+        // exception (seen when the app became active before the core had started).
+        if node != nil, !engine.isRunning { try? engine.start() }
     }
 }

@@ -66,6 +66,32 @@ let melondsCXX: [CXXSetting] = melondsPaths.map { .headerSearchPath($0) } + [
 ]
 let melondsC: [CSetting] = [.define("NDEBUG"), .unsafeFlags(["-O2", "-w", "-fwrapv"])]
 
+// mupen64plus-core + mupen64plus-rsp-hle (GPL-2.0-or-later), Nintendo 64, vendored unmodified in
+// Sources/MUPEN64/mupen64plus-core and Sources/MUPEN64/rsp-hle (see ThirdParty/mupen64/README.md).
+// Cached interpreter only: NO_ASM, no DYNAREC/NEW_DYNAREC, no recompiler file vendored. No
+// M64P_PARALLEL (the work queue runs inline), no OSD, netplay, debugger, LIRC or libpng.
+// glue/shim comes first on the include path (a pthread-backed stand-in for the few SDL calls).
+// glue/src holds our front end, static plugin tables and stand-ins for the files left out;
+// glue/units compiles rsp-hle's plugin.c with renamed entry points.
+let mupenExcluded = ["mupen64plus-core/LICENSES", "mupen64plus-core/doc", "rsp-hle/LICENSES",
+                     "rsp-hle/src/plugin.c", "mupen64plus-core/src/main/main.c",
+                     "mupen64plus-core/src/device/r4300/opcodes.md",
+                     "mupen64plus-core/src/device/r4300/mips_instructions.def"]
+let mupenC: [CSetting] = [
+    .headerSearchPath("glue/shim"),
+    .headerSearchPath("mupen64plus-core/src"),
+    .headerSearchPath("mupen64plus-core/src/api"),
+    .headerSearchPath("mupen64plus-core/subprojects"),
+    .headerSearchPath("mupen64plus-core/subprojects/md5"),
+    .headerSearchPath("mupen64plus-core/subprojects/xxhash"),
+    .define("NO_ASM"),
+    .define("NOCRYPT"),
+    .define("NOUNCRYPT"),
+    .define("NDEBUG"),
+    // Optimised even in Debug (like the other cores); upstream's own warnings are not ours to fix.
+    .unsafeFlags(["-O2", "-w", "-fno-strict-aliasing"]),
+]
+
 let package = Package(
     name: "CoreKit",
     platforms: [.iOS("26.0"), .macOS("26.0")],
@@ -74,6 +100,7 @@ let package = Package(
         // Separate product so the app opts in when it wires the new systems up.
         .library(name: "AresCore", targets: ["AresCore"]),
         .library(name: "DSCore", targets: ["DSCore"]),
+        .library(name: "N64Core", targets: ["N64Core"]),
     ],
     targets: [
         .target(name: "CoreKit", swiftSettings: fast),
@@ -88,8 +115,14 @@ let package = Package(
                 sources: ["melonds", "glue/src", "glue/units"], publicHeadersPath: "glue/include",
                 cSettings: melondsC, cxxSettings: melondsCXX),
         .target(name: "DSCore", dependencies: ["CoreKit", "MELONDS"], swiftSettings: fast),
+        .target(name: "MUPEN64", exclude: mupenExcluded,
+                sources: ["mupen64plus-core/src", "mupen64plus-core/subprojects", "rsp-hle/src", "glue/src",
+                          "glue/units"],
+                publicHeadersPath: "glue/include", cSettings: mupenC, linkerSettings: [.linkedLibrary("z")]),
+        .target(name: "N64Core", dependencies: ["CoreKit", "MUPEN64"],
+                resources: [.copy("Resources/mupen64plus.ini")], swiftSettings: fast),
         .testTarget(name: "CoreKitTests",
-                    dependencies: ["CoreKit", "NESCore", "GBCore", "GBACore", "AresCore", "DSCore"]),
+                    dependencies: ["CoreKit", "NESCore", "GBCore", "GBACore", "AresCore", "DSCore", "N64Core"]),
     ],
     cxxLanguageStandard: .cxx20
 )

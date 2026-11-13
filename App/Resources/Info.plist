@@ -58,6 +58,9 @@
 				<string>com.iqlabs.duoemulator.gen</string>
 				<string>com.iqlabs.duoemulator.smd</string>
 				<string>com.iqlabs.duoemulator.nds</string>
+				<string>com.iqlabs.duoemulator.z64</string>
+				<string>com.iqlabs.duoemulator.n64</string>
+				<string>com.iqlabs.duoemulator.v64</string>
 			</array>
 		</dict>
 	</array>
@@ -175,6 +178,36 @@
 			<array><string>public.data</string></array>
 			<key>UTTypeTagSpecification</key>
 			<dict><key>public.filename-extension</key><array><string>nds</string></array></dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.iqlabs.duoemulator.z64</string>
+			<key>UTTypeDescription</key>
+			<string>Nintendo 64 game file</string>
+			<key>UTTypeConformsTo</key>
+			<array><string>public.data</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict><key>public.filename-extension</key><array><string>z64</string></array></dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.iqlabs.duoemulator.n64</string>
+			<key>UTTypeDescription</key>
+			<string>Nintendo 64 game file</string>
+			<key>UTTypeConformsTo</key>
+			<array><string>public.data</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict><key>public.filename-extension</key><array><string>n64</string></array></dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.iqlabs.duoemulator.v64</string>
+			<key>UTTypeDescription</key>
+			<string>Nintendo 64 game file</string>
+			<key>UTTypeConformsTo</key>
+			<array><string>public.data</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict><key>public.filename-extension</key><array><string>v64</string></array></dict>
 		</dict>
 	</array>
 	<key>UILaunchScreen</key>

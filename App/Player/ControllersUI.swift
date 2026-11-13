@@ -214,6 +214,11 @@ struct ControllersSheet: View {
         case .gba: list += [(.a, "A"), (.b, "B"), (.l, "L"), (.r, "R")]
         case .snes, .ds: list += [(.a, "A"), (.b, "B"), (.x, "X"), (.y, "Y"), (.l, "L"), (.r, "R")]
         case .md: list += [(.y, "A"), (.b, "B"), (.a, "C"), (.x, "X"), (.l, "Y"), (.r, "Z")]
+        case .n64:
+            list += [(.a, "A"), (.b, "B"), (.z, "Z"), (.l, "L"), (.r, "R"),
+                     (.cUp, "C up"), (.cDown, "C down"), (.cLeft, "C left"), (.cRight, "C right")]
+            list.append((.start, "Start"))
+            return list
         }
         list += [(.start, "Start"), (.select, system == .md ? "Mode" : "Select")]
         return list
@@ -238,6 +243,10 @@ struct ControllersSheet: View {
         case .buttonMenu: "Menu"
         case .buttonOptions: "Options"
         case .buttonHome: "Home"
+        case .rightStickUp: "Right stick up"
+        case .rightStickDown: "Right stick down"
+        case .rightStickLeft: "Right stick left"
+        case .rightStickRight: "Right stick right"
         }
     }
 

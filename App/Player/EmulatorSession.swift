@@ -4,6 +4,7 @@ import DSCore
 import Foundation
 import GBACore
 import GBCore
+import N64Core
 import NESCore
 import Synchronization
 
@@ -73,6 +74,29 @@ final class InputLatch: Sendable {
     static func stylus(x: Int, y: Int) -> UInt32 {
         1 << 31 | UInt32(min(max(y, 0), 0x7FFF)) << 16 | UInt32(min(max(x, 0), 0xFFFF))
     }
+
+    /// Analog sticks (Nintendo 64), packed by `Self.pack`: the touch stick, player 1's and
+    /// player 2's controller sticks. Already shaped (dead zone, range) by whoever wrote them.
+    let touchStick = Atomic<UInt64>(0)
+    let padStick = Atomic<UInt64>(0)
+    let player2Stick = Atomic<UInt64>(0)
+
+    static func pack(_ s: AnalogStick) -> UInt64 {
+        UInt64(Float(s.x).bitPattern) << 32 | UInt64(Float(s.y).bitPattern)
+    }
+
+    static func unpack(_ v: UInt64) -> AnalogStick {
+        AnalogStick(x: Double(Float(bitPattern: UInt32(truncatingIfNeeded: v >> 32))),
+                    y: Double(Float(bitPattern: UInt32(truncatingIfNeeded: v))))
+    }
+
+    /// Player 1's stick: the touch stick while it is held, else the controller's.
+    var stick: AnalogStick {
+        let t = Self.unpack(touchStick.load(ordering: .relaxed))
+        return t != .centre ? t : Self.unpack(padStick.load(ordering: .relaxed))
+    }
+
+    var stickPlayer2: AnalogStick { Self.unpack(player2Stick.load(ordering: .relaxed)) }
 
     var stylusPoint: TouchPoint? {
         let v = stylus.load(ordering: .relaxed)
@@ -156,6 +180,7 @@ final class EmulatorSession: @unchecked Sendable {
         case .snes: return try SNESSystem(rom: rom, battery: battery)
         case .md: return try MDSystem(rom: rom, battery: battery)
         case .ds: return try DSSystem(rom: rom, battery: battery)
+        case .n64: return try N64System(rom: rom, battery: battery)
         }
     }
 
@@ -166,7 +191,7 @@ final class EmulatorSession: @unchecked Sendable {
     }
 
     /// One live core per process: a quick quit-and-reopen waits for the old thread to let go
-    /// (ares keeps its console in process-wide state).
+    /// (ares and mupen64plus keep their machine in process-wide state).
     private static let coreGate = NSLock()
 
     private func run() {
@@ -187,6 +212,7 @@ final class EmulatorSession: @unchecked Sendable {
 
         var lastSize = core.videoSize
         let hasTouch = core.touchScreen != nil
+        let hasStick = system == .n64
         let basePeriod = 1.0 / core.frameRate
         let targetFill = Double(core.audioSampleRate) * basePeriod * 3   // ~3 frames of audio queued
         var next = ProcessInfo.processInfo.systemUptime
@@ -250,6 +276,10 @@ final class EmulatorSession: @unchecked Sendable {
                 }
                 let p2 = InputState(rawValue: input.player2.load(ordering: .relaxed)).sanitised
                 if hasTouch { core.setTouch(input.stylusPoint) }
+                if hasStick {
+                    core.setAnalog(input.stick, player: 0)
+                    core.setAnalog(input.stickPlayer2, player: 1)
+                }
                 for i in 0..<speed {
                     if core.maxPlayers > 1 { core.runFrame(inputs: [held, p2]) } else { core.runFrame(input: held) }
                     frameCount += 1
@@ -282,12 +312,16 @@ final class EmulatorSession: @unchecked Sendable {
     private func discardAudio(_ core: any EmulatorCore) { core.discardAudio() }
 
     /// Big states are snapshotted less often: GBA (~400 KB) every 15 frames, so rewind still
-    /// reaches ~15 s back; DS (~4.5 MB, mostly main RAM) every 60, which reaches ~5 s back.
+    /// reaches ~15 s back; DS (~4.5 MB, mostly main RAM) every 60, which reaches ~5 s back;
+    /// Nintendo 64 every 180.
     private var rewindInterval = 4
 
     private func pushRewind(_ state: Data) {
         if state.count > 100_000 { rewindInterval = 15 }
         if state.count > 2_000_000 { rewindInterval = 60 }
+        // Nintendo 64 states are gzip files written by the core (tens of ms for a real game's
+        // 8 MB of RDRAM): snapshot every 3 s so play doesn't hitch; rewind reaches further, coarser.
+        if system == .n64 { rewindInterval = 180 }
         rewindStates.append(state)
         rewindBytes += state.count
         while rewindBytes > rewindCap, !rewindStates.isEmpty {

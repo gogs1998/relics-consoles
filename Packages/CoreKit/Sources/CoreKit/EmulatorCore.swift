@@ -9,6 +9,7 @@ public enum SystemID: String, Codable, Sendable, CaseIterable, Identifiable {
     case snes
     case md
     case ds
+    case n64
 
     public var id: String { rawValue }
 
@@ -22,6 +23,7 @@ public enum SystemID: String, Codable, Sendable, CaseIterable, Identifiable {
         case .snes: "SNES"
         case .md: "Mega Drive / Genesis"
         case .ds: "Nintendo DS"
+        case .n64: "Nintendo 64"
         }
     }
 
@@ -34,6 +36,7 @@ public enum SystemID: String, Codable, Sendable, CaseIterable, Identifiable {
         case .snes: ["sfc", "smc"]
         case .md: ["md", "gen", "bin", "smd"]
         case .ds: ["nds"]
+        case .n64: ["z64", "n64", "v64"]
         }
     }
 
@@ -60,6 +63,12 @@ public struct InputState: OptionSet, Sendable, Hashable {
     public static let r      = InputState(rawValue: 1 << 9)
     public static let start  = InputState(rawValue: 1 << 10)
     public static let select = InputState(rawValue: 1 << 11)
+    /// Nintendo 64: the Z trigger and the four C buttons.
+    public static let z      = InputState(rawValue: 1 << 12)
+    public static let cUp    = InputState(rawValue: 1 << 13)
+    public static let cDown  = InputState(rawValue: 1 << 14)
+    public static let cLeft  = InputState(rawValue: 1 << 15)
+    public static let cRight = InputState(rawValue: 1 << 16)
 
     /// Real pads cannot press opposite directions; some games crash if they see it.
     public var sanitised: InputState {
@@ -87,6 +96,15 @@ public struct ScreenRegion: Sendable, Equatable, Hashable {
     public init(x: Int, y: Int, width: Int, height: Int, isTouch: Bool = false) {
         self.x = x; self.y = y; self.width = width; self.height = height; self.isTouch = isTouch
     }
+}
+
+/// An analog stick, each axis -1...1 (up and right positive). Already shaped by the input layer
+/// (dead zone, range); cores only scale it to their native range.
+public struct AnalogStick: Sendable, Equatable, Hashable {
+    public var x: Double
+    public var y: Double
+    public init(x: Double, y: Double) { self.x = x; self.y = y }
+    public static let centre = AnalogStick(x: 0, y: 0)
 }
 
 /// A stylus position on a touch screen, in that screen's own pixels (0..<width, 0..<height).
@@ -151,6 +169,8 @@ public protocol EmulatorCore: AnyObject {
     /// Sets (or lifts, with nil) the stylus on the touch screen for the following frames.
     /// Ignored by cores without one.
     func setTouch(_ point: TouchPoint?)
+    /// Sets player `player`'s analog stick for the following frames. Ignored by cores without one.
+    func setAnalog(_ stick: AnalogStick, player: Int)
 }
 
 public extension EmulatorCore {
@@ -158,6 +178,7 @@ public extension EmulatorCore {
     func runFrame(inputs: [InputState]) { runFrame(input: inputs.first ?? []) }
     var screens: [ScreenRegion] { [ScreenRegion(x: 0, y: 0, width: videoSize.width, height: videoSize.height)] }
     func setTouch(_ point: TouchPoint?) {}
+    func setAnalog(_ stick: AnalogStick, player: Int) {}
     /// The touch screen, if the system has one.
     var touchScreen: ScreenRegion? { screens.first { $0.isTouch } }
 }
@@ -171,6 +192,7 @@ public enum CoreFactory {
             return .nes
         }
         if dsHeaderValid(rom) { return .ds }
+        if n64ByteOrder(rom) != nil { return .n64 }
         if rom.count >= 0xC0 {
             // Game Boy Advance header: a branch at 0 (byte 3 = $EA), the fixed $96 at $B2 and a
             // valid complement check at $BD. Checked before the GB header, which a GBA ROM can pass by chance.
@@ -205,8 +227,45 @@ public enum CoreFactory {
         // ".bin" is ambiguous (many systems use it): only claimed above, by the "SEGA" header.
         case "md", "gen", "smd": return .md
         case "nds": return .ds
+        case "z64", "n64", "v64": return .n64
         default: return nil
         }
+    }
+
+    /// The byte orders a Nintendo 64 ROM dump comes in, told apart by the cartridge's first word
+    /// (the PI configuration, 0x80371240 in the console's own big-endian order).
+    public enum N64ByteOrder: Sendable { case bigEndian, byteSwapped, littleEndian }
+
+    public static func n64ByteOrder(_ rom: Data) -> N64ByteOrder? {
+        guard rom.count >= 0x1000 else { return nil }
+        let b = rom.startIndex
+        switch (rom[b], rom[b + 1], rom[b + 2], rom[b + 3]) {
+        case (0x80, 0x37, 0x12, 0x40): return .bigEndian      // .z64
+        case (0x37, 0x80, 0x40, 0x12): return .byteSwapped    // .v64 (16-bit words swapped)
+        case (0x40, 0x12, 0x37, 0x80): return .littleEndian   // .n64 (32-bit words reversed)
+        default: return nil
+        }
+    }
+
+    /// The ROM in big-endian (.z64) order, or nil if it isn't a Nintendo 64 ROM.
+    public static func n64Normalised(_ rom: Data) -> Data? {
+        guard let order = n64ByteOrder(rom) else { return nil }
+        if order == .bigEndian { return rom }
+        var out = Data(rom)
+        let n = out.count & ~3
+        out.withUnsafeMutableBytes { raw in
+            let p = raw.bindMemory(to: UInt8.self)
+            var i = 0
+            while i < n {
+                if order == .byteSwapped {
+                    p.swapAt(i, i + 1); p.swapAt(i + 2, i + 3)
+                } else {
+                    p.swapAt(i, i + 3); p.swapAt(i + 1, i + 2)
+                }
+                i += 4
+            }
+        }
+        return out
     }
 
     /// Nintendo DS cartridge header: ARM9 and ARM7 binaries (offset >= 0x200, non-empty) inside the

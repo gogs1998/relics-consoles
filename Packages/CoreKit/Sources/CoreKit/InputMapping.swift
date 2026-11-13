@@ -13,6 +13,8 @@ public enum PhysicalInput: String, Codable, CaseIterable, Sendable, CodingKeyRep
     case dpadUp, dpadDown, dpadLeft, dpadRight
     case leftThumbstickButton, rightThumbstickButton
     case buttonMenu, buttonOptions, buttonHome
+    /// The right thumbstick pushed past half way in one direction (Nintendo 64: the C buttons).
+    case rightStickUp, rightStickDown, rightStickLeft, rightStickRight
 }
 
 /// App actions a controller or keyboard can trigger.
@@ -94,6 +96,9 @@ public struct ControllerMapping: Codable, Hashable, Sendable {
     ///   = A/B/C (left to right, as on the pad's bottom row); the top row X/Y/Z on left shoulder /
     ///   north / right shoulder. In InputState terms (AresCore's MD mapping): A = .y, B = .b, C = .a,
     ///   X = .x, Y = .l, Z = .r.
+    /// - Nintendo 64: south = A, west = B, shoulders = L / R, left trigger = Z (right trigger too),
+    ///   right stick = the C buttons, east / north = C-down / C-left; the left stick is the analog
+    ///   stick, not the d-pad (`stickAsDpad` off).
     /// - Every system: d-pad = directions, menu = Start, options = Select (Mode on the Mega Drive).
     /// - Hotkeys: home alone = menu; options held + left/right shoulder = load/save state,
     ///   options + left/right trigger = rewind/fast-forward; triggers alone = rewind/fast-forward
@@ -119,9 +124,18 @@ public struct ControllerMapping: Codable, Hashable, Sendable {
             b[.leftShoulder] = .x       // X
             b[.buttonY] = .l            // Y
             b[.rightShoulder] = .r      // Z
+        case .n64:
+            b[.buttonA] = .a; b[.buttonX] = .b; b[.buttonB] = .cDown; b[.buttonY] = .cLeft
+            b[.leftShoulder] = .l; b[.rightShoulder] = .r; b[.leftTrigger] = .z; b[.rightTrigger] = .z
+            b[.rightStickUp] = .cUp; b[.rightStickDown] = .cDown
+            b[.rightStickLeft] = .cLeft; b[.rightStickRight] = .cRight
+            b[.buttonOptions] = nil      // no Select on this pad
         }
         return ControllerMapping(buttons: b, hotkeys: defaultHotkeys(usesTriggers: b[.leftTrigger] != nil
-                                                                        || b[.rightTrigger] != nil))
+                                                                        || b[.rightTrigger] != nil),
+                                 stickAsDpad: system != .n64,
+                                 // an analog stick wants a small radial dead zone, not a D-pad's
+                                 stickDeadZone: system == .n64 ? 0.12 : defaultDeadZone)
     }
 
     static func defaultHotkeys(usesTriggers: Bool) -> [HotkeyBinding] {
@@ -145,6 +159,7 @@ public struct ControllerMapping: Codable, Hashable, Sendable {
 /// HID usage values (GCKeyCode raw values) for the keys the default keyboard mappings use.
 public enum KeyCode {
     public static let a = 0x04, c = 0x06, d = 0x07, e = 0x08, q = 0x14, s = 0x16, v = 0x19, w = 0x1A
+    public static let i = 0x0C, j = 0x0D, k = 0x0E, l = 0x0F
     public static let x = 0x1B, z = 0x1D
     public static let returnKey = 0x28, escape = 0x29, backspace = 0x2A, tab = 0x2B, space = 0x2C
     public static let f1 = 0x3A, f2 = 0x3B, f3 = 0x3C, f4 = 0x3D
@@ -181,6 +196,7 @@ public struct KeyboardMapping: Codable, Hashable, Sendable {
     /// - NES, GB, GBC: Z = B, X = A.  GBA: plus Q / E = L / R.
     /// - SNES and DS: Z = B, X = A, A = Y, S = X, Q / E = L / R.
     /// - Mega Drive: Z X C = A B C, A S D = X Y Z (bottom and top rows).
+    /// - Nintendo 64: X = A, Z = B, A = Z, Q / E = L / R, I J K L = C up / left / down / right.
     /// WASD is not a direction cluster by default: A and S (and D on the Mega Drive) are face buttons.
     /// Hotkeys: F1 save state, F4 load state, Tab fast-forward, Backspace rewind, Escape menu.
     public static func defaults(for system: SystemID) -> KeyboardMapping {
@@ -199,6 +215,10 @@ public struct KeyboardMapping: Codable, Hashable, Sendable {
         case .md:
             b[KeyCode.z] = .y; b[KeyCode.x] = .b; b[KeyCode.c] = .a      // A B C
             b[KeyCode.a] = .x; b[KeyCode.s] = .l; b[KeyCode.d] = .r      // X Y Z
+        case .n64:
+            b[KeyCode.x] = .a; b[KeyCode.z] = .b; b[KeyCode.a] = .z; b[KeyCode.q] = .l; b[KeyCode.e] = .r
+            b[KeyCode.i] = .cUp; b[KeyCode.j] = .cLeft; b[KeyCode.k] = .cDown; b[KeyCode.l] = .cRight
+            b[KeyCode.rightShift] = nil
         }
         let h: [Int: Hotkey] = [
             KeyCode.f1: .saveState, KeyCode.f4: .loadState, KeyCode.tab: .fastForward,
@@ -259,6 +279,17 @@ public enum InputMapper {
             }
         }
         return (buttons.sanitised, hotkeys)
+    }
+
+    /// The right stick as four digital inputs: each direction past `threshold` on its axis.
+    public static func rightStickInputs(x: Double, y: Double, threshold: Double = 0.5) -> Set<PhysicalInput> {
+        var s = Set<PhysicalInput>()
+        guard x.isFinite, y.isFinite else { return s }
+        if y > threshold { s.insert(.rightStickUp) }
+        if y < -threshold { s.insert(.rightStickDown) }
+        if x < -threshold { s.insert(.rightStickLeft) }
+        if x > threshold { s.insert(.rightStickRight) }
+        return s
     }
 
     /// An analog vector → up to two directions.

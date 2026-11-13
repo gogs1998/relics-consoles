@@ -12,7 +12,7 @@ import Testing
 
     // MARK: defaults
 
-    @Test(arguments: SystemID.allCases)
+    @Test(arguments: SystemID.allCases.filter { $0 != .n64 })
     func everySystemHasDirectionsStartSelectAndHotkeys(_ system: SystemID) {
         let m = ControllerMapping.defaults(for: system)
         #expect(m.buttons[.dpadUp] == .up)
@@ -36,6 +36,30 @@ import Testing
         #expect(m.hotkeys.contains(HotkeyBinding(trigger: .leftTrigger, hotkey: .rewind)))
         #expect(m.hotkeys.contains(HotkeyBinding(trigger: .rightTrigger, hotkey: .fastForward)))
         let k = KeyboardMapping.defaults(for: system)
+        #expect(Set(k.hotkeys.values) == Set(Hotkey.allCases))
+    }
+
+    /// The Nintendo 64: the left stick is analog, the right stick the C buttons, the triggers Z.
+    @Test func nintendo64Defaults() {
+        let m = ControllerMapping.defaults(for: .n64)
+        #expect(m.buttons[.dpadUp] == .up && m.buttons[.buttonMenu] == .start)
+        #expect(m.buttons[.buttonA] == .a && m.buttons[.buttonX] == .b)
+        #expect(m.buttons[.leftTrigger] == .z && m.buttons[.rightTrigger] == .z)
+        #expect(m.buttons[.leftShoulder] == .l && m.buttons[.rightShoulder] == .r)
+        #expect(m.buttons[.buttonOptions] == nil)   // no Select on this pad; Options stays a hotkey modifier
+        #expect(!m.stickAsDpad && m.stickDeadZone == 0.12)
+        #expect(m.buttons[.rightStickUp] == .cUp && m.buttons[.rightStickDown] == .cDown)
+        #expect(m.buttons[.rightStickLeft] == .cLeft && m.buttons[.rightStickRight] == .cRight)
+        #expect(Set(m.hotkeys.map(\.hotkey)) == Set(Hotkey.allCases))
+        #expect(!m.hotkeys.contains(HotkeyBinding(trigger: .leftTrigger, hotkey: .rewind)))   // triggers are Z
+        // the stick never presses directions; the right stick presses C buttons (remappable like any input)
+        let r = InputMapper.resolve(pressed: InputMapper.rightStickInputs(x: -0.9, y: 0.7), stick: (1, 0), mapping: m)
+        #expect(r.buttons == [.cLeft, .cUp])
+        var remapped = m
+        remapped.bind(.rightStickUp, to: .z)
+        #expect(InputMapper.resolve(pressed: [.rightStickUp], stick: (0, 0), mapping: remapped).buttons == .z)
+        let k = KeyboardMapping.defaults(for: .n64)
+        #expect(k.buttons[KeyCode.i] == .cUp && k.buttons[KeyCode.x] == .a && k.buttons[KeyCode.a] == .z)
         #expect(Set(k.hotkeys.values) == Set(Hotkey.allCases))
     }
 

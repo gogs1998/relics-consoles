@@ -1,5 +1,52 @@
 # HANDOFF: Duo Emulator ("Foldback")
 
+## Update, 13 Nov 2026 (Nintendo 64: mupen64plus + rsp-hle, no RDP renderer yet)
+- **Licence finding (blocker for the plan):** GLideN64 (`a04081a`) is **GPL-2.0-only**: its LICENSE says "licensed
+  under the GNU General Public License version 2" with no "or later", and its core sources have no headers. That can't
+  go into the GPLv3 app, so **GLideN64 is not vendored**. mupen64plus-core (`daae68e`) and rsp-hle (`4cdc305`) are
+  GPL-2.0-or-later (every file's header), so they're fine; their bundled MiniZip/MD5 (zlib), xxHash and the
+  CIC-6105 algorithm (BSD-2) are too. Details and the alternatives: `ThirdParty/mupen64/README.md`.
+- **What plays:** the core runs any N64 ROM (CPU, RSP-HLE audio, saves, controllers), but the picture is our own **VI
+  scan-out** of RDRAM: CPU-drawn framebuffers show (our test cart), **RDP graphics (all real 3D/2D games) don't**.
+  A real renderer needs Gordon's decision + a download: paraLLEl-RDP (MIT) on MoltenVK (Apache-2.0) with cxd4's
+  RSP interpreter for graphics tasks is the clean no-JIT option; or a relicence grant from GLideN64's authors.
+- **Core:** vendored byte-identical (200 files) in `Packages/CoreKit/Sources/MUPEN64/`; no patches. Cached interpreter
+  only, no recompiler file in the repo, HLE boot (no PIF ROM), no M64P_PARALLEL/OSD/netplay/debugger/libpng/SDL.
+  Our glue: front end that parks the core's own loop at each vertical interrupt (frame stepping and synchronous
+  save states at the same point), static plugin tables behind `osal_dynlib_getproc`, our video/audio/input plugins,
+  an SDL stand-in header, osal/vidext/eventloop/screenshot stand-ins, build units for `main.c` and rsp-hle's
+  `plugin.c` (renamed entry points). One N64 machine per process (`coreGate`).
+- **Swift:** `N64Core.N64System` (320x240, 60/50 Hz, 48 kHz mono, 2 ports, analog via new
+  `EmulatorCore.setAnalog`), `SystemID.n64`, `.z64/.n64/.v64` detection + byte-order normalisation, InputState
+  `.z/.cUp/.cDown/.cLeft/.cRight`. Battery = "N64B" blob (EEPROM, SRAM, FlashRAM, Controller Pak files).
+  **Controller Pak works and persists** (both pads have one; the test writes it, a fresh machine reads it back).
+- **App:** import of N64 files (64 MB limit); N64 layouts for every area (portrait/table deck, book left/right,
+  landscape margins) in `App/Controller/N64Layouts.swift`; new `.stick` control: true analog (no snapping),
+  sensitivity (range), dead zone, optional outer full-tilt ring, optional re-centre-under-thumb, knob follows the
+  thumb; settings in the layout editor's panel for N64 (and saved with the layout; old layout files still load).
+  The landscape editor now keeps every control off the game rect (all systems). Physical pads: left stick =
+  analog (radial dead zone 0.12), right stick = C buttons via new remappable `rightStick*` inputs, triggers = Z;
+  keyboard X/Z/A = A/B/Z, IJKL = C. N64 rewind snapshots every 3 s (states are gzip files).
+- **Verified on the Mac (`swift test`, 92 pass):** boots `n64_demo.z64` (ours, `Tools/build_n64_roms.py`) with HLE
+  boot; non-black frame; A/B/Z/C/L/R/Start/D-pad and the analog stick reach the game; 400 Hz tone at 48 kHz
+  (game rate 32 kHz); save state round trip deterministic (also via `StateContainer`; junk/truncated rejected,
+  machine untouched); EEPROM + Controller Pak battery round trip; reset; one-machine rule. **Speed: ~390-430 fps**
+  (6.5-7x real time) in release and debug (C is -O2 in both) for our light cart; save state 75 KB in ~15 ms.
+- **Verified in the simulator** (Shared iPhone 17e, reused: 2-3 sims already booted): `N64UITests` (5) pass: touch
+  stick reaches full right with no vertical drift, A reaches the latch, no control intersects the game in portrait,
+  landscape and table; the editor shows the four stick settings. App unit tests incl. `N64LayoutTests`.
+  Shots: `docs/shots/iphone-n64.png`, `iphone-landscape-n64.png`, `table-n64.png`, `book-n64.png`, `editor-n64.png`.
+- **Fixed on the way (all systems):** `AudioOutput.resume()` could start an AVAudioEngine with no source node when the
+  app became active before the core had started, which raises an Objective-C exception (one UI-test crash); it now
+  waits for the graph.
+- **Needs Gordon's device:** iPhone speed of the interpreter with a real game (unknown until a renderer exists),
+  how the stick feels (sensitivity/dead-zone defaults are guesses), audio, a real controller's sticks.
+- **Open:** the RDP renderer (above); the mandatory **Fable licence review** of mupen64plus/rsp-hle has not been run
+  (flag `n64_cic_nus_6105.c` as the firmware-adjacent file); 64DD, Transfer Pak, Rumble Pak (the pad has a
+  Controller Pak), VRU and per-game controller-pak/rumble choice are not exposed; 4-player is 2 ports.
+
+---
+
 ## Update, 11 Nov 2026 (Nintendo DS: melonDS)
 - **Core:** melonDS commit `497aa6c` (GPL-3.0; the app is GPLv3 now) vendored byte-identical in
   `Packages/CoreKit/Sources/MELONDS/melonds` (DS mode only; no frontend, DSi, network, OpenGL, JIT or GDB

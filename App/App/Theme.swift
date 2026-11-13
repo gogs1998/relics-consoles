@@ -27,6 +27,7 @@ enum Theme {
         case .snes: Color(red: 0.80, green: 0.55, blue: 0.70)   // heather
         case .md: Color(red: 0.30, green: 0.36, blue: 0.48)     // ink blue
         case .ds: Color(red: 0.55, green: 0.50, blue: 0.70)     // lavender slate
+        case .n64: Color(red: 0.36, green: 0.58, blue: 0.62)    // teal grey
         }
     }
 

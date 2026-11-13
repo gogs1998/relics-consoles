@@ -22,6 +22,11 @@ struct AboutView: View {
                 file: "Licence-melonDS-GPL-3.0"),
         Licence(id: "freebios", title: "FreeBIOS", detail: "Part of melonDS · the DS BIOS replacement by Gilead Kutnick (no Nintendo code) · BSD 2-Clause",
                 file: "Licence-FreeBIOS-BSD-2-Clause"),
+        Licence(id: "mupen64plus", title: "mupen64plus and rsp-hle",
+                detail: "Nintendo 64 core and RSP · GPL-2.0-or-later · unmodified copies of mupen64plus-core commit daae68e and mupen64plus-rsp-hle commit 4cdc305; their source is at github.com/mupen64plus",
+                file: "Licence-mupen64plus-GPL-2.0-or-later"),
+        Licence(id: "mupen64plus-bundled", title: "MiniZip, MD5, xxHash, CIC-NUS-6105", detail: "Parts of mupen64plus · zlib, BSD 2-Clause",
+                file: "Licence-mupen64plus-bundled"),
         Licence(id: "melonds-bundled", title: "xxHash, FatFs, tiny-AES-c, blip_buf", detail: "Parts of melonDS · BSD 2-Clause, FatFs, Unlicense, LGPL-2.1",
                 file: "Licence-melonDS-bundled"),
     ]

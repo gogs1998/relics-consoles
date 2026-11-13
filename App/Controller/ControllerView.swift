@@ -30,6 +30,8 @@ struct ControllerView: View {
 struct ControlArt: View {
     let control: Control
     let model: ControllerModel
+    /// The layout editor passes its unsaved stick setting; the controller uses the model's.
+    var outerRing: Bool?
     var body: some View { controlView(control) }
 
     @ViewBuilder
@@ -51,7 +53,72 @@ struct ControlArt: View {
             RoundKeyView(symbol: "forward.fill", label: "Fast forward (hold)", pressed: model.fastForwardDown)
         case .rewind:
             RoundKeyView(symbol: "backward.fill", label: "Rewind (hold)", pressed: model.rewindDown)
+        case .stick:
+            StickView(knob: model.stickKnob, base: model.stickBase, active: model.stickValue != .centre,
+                      outerRing: outerRing ?? model.settings.stickOuterRing)
         }
+    }
+}
+
+// MARK: - Analog stick
+
+/// A thumbstick: a recessed well (and, optionally, the outer full-deflection ring) with a domed,
+/// ridged knob that follows the thumb. When the stick re-centres, the well slides under the thumb.
+struct StickView: View {
+    var knob: CGVector
+    var base: CGVector
+    var active: Bool
+    var outerRing: Bool
+
+    var body: some View {
+        GeometryReader { geo in
+            let s = min(geo.size.width, geo.size.height)
+            ZStack {
+                if outerRing {
+                    Circle()
+                        .strokeBorder(Theme.ember.opacity(active ? 0.55 : 0.28),
+                                      style: StrokeStyle(lineWidth: s * 0.035, dash: [s * 0.05, s * 0.04]))
+                        .frame(width: s * StickMath.ringScale, height: s * StickMath.ringScale)
+                }
+                ZStack {
+                    Circle()
+                        .fill(RadialGradient(colors: [Color.black.opacity(0.6), Color.black.opacity(0.25)],
+                                             center: .center, startRadius: s * 0.1, endRadius: s * 0.5))
+                    Circle()
+                        .stroke(LinearGradient(colors: [Color.white.opacity(0.03), Color.white.opacity(0.14)],
+                                               startPoint: .top, endPoint: .bottom), lineWidth: 1.2)
+                    // Eight faint notches round the rim: orientation only (the stick never snaps).
+                    ForEach(0..<8, id: \.self) { i in
+                        Capsule()
+                            .fill(Color.white.opacity(0.07))
+                            .frame(width: 2, height: s * 0.06)
+                            .offset(y: -s * 0.44)
+                            .rotationEffect(.degrees(Double(i) * 45))
+                    }
+                }
+                .frame(width: s, height: s)
+                .offset(x: base.dx, y: base.dy)
+                ZStack {
+                    Circle()
+                        .fill(RadialGradient(colors: [Color(white: 0.36), Color(white: 0.15)],
+                                             center: UnitPoint(x: 0.38, y: 0.32), startRadius: 0, endRadius: s * 0.3))
+                        .shadow(color: .black.opacity(0.65), radius: s * 0.04, y: s * 0.03)
+                    Circle()
+                        .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                    Circle()
+                        .stroke(Color.black.opacity(0.35), lineWidth: s * 0.02)
+                        .padding(s * 0.07)
+                    Circle()
+                        .fill(active ? Theme.ember.opacity(0.85) : Color.white.opacity(0.08))
+                        .frame(width: s * 0.07, height: s * 0.07)
+                }
+                .frame(width: s * 0.52, height: s * 0.52)
+                .offset(x: base.dx + knob.dx, y: base.dy + knob.dy)
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+        }
+        .accessibilityElement()
+        .accessibilityLabel("Analog stick")
     }
 }
 
@@ -218,6 +285,7 @@ struct FaceButtonView: View {
                         .blur(radius: d * 0.02)
                     Text(label)
                         .font(.rounded(.title3, weight: .heavy))
+                        .minimumScaleFactor(0.5)
                         .foregroundStyle(Color.black.opacity(0.42))
                         .shadow(color: .white.opacity(0.35), radius: 0, x: 0, y: 1)
                 }
@@ -231,7 +299,18 @@ struct FaceButtonView: View {
             .frame(width: geo.size.width, height: geo.size.height)
         }
         .accessibilityElement()
-        .accessibilityLabel("\(label) button")
+        .accessibilityLabel(Self.spoken(label))
+    }
+
+    /// The C buttons are drawn as arrows; say what they are.
+    static func spoken(_ label: String) -> String {
+        switch label {
+        case N64Layout.cUp: "C up button"
+        case N64Layout.cDown: "C down button"
+        case N64Layout.cLeft: "C left button"
+        case N64Layout.cRight: "C right button"
+        default: "\(label) button"
+        }
     }
 }
 

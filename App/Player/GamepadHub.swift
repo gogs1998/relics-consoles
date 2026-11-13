@@ -73,7 +73,7 @@ final class GamepadHub {
     init(system: SystemID) {
         self.system = system
         // Known before the core starts, so a second pad already paired is given player 2 at once.
-        players = [.nes, .snes, .md].contains(system) ? 2 : 1
+        players = [.nes, .snes, .md, .n64].contains(system) ? 2 : 1
         mapping = MappingStore.controller(for: system)
         keyboardMapping = MappingStore.keyboard(for: system)
     }
@@ -114,6 +114,8 @@ final class GamepadHub {
         latch?.controller.store(0, ordering: .relaxed)
         latch?.player2.store(0, ordering: .relaxed)
         latch?.keyboard.store(0, ordering: .relaxed)
+        latch?.padStick.store(0, ordering: .relaxed)
+        latch?.player2Stick.store(0, ordering: .relaxed)
     }
 
     // MARK: connection and players
@@ -173,6 +175,25 @@ final class GamepadHub {
         }
     }
 
+    /// The left stick as an analog stick (Nintendo 64): a radial dead zone, rescaled so the
+    /// output still starts from zero at its edge and reaches full deflection at the rim.
+    nonisolated static func shapedStick(_ stick: (x: Double, y: Double), deadZone: Double) -> AnalogStick {
+        guard stick.x.isFinite, stick.y.isFinite else { return .centre }
+        let zone = min(max(deadZone, 0), 0.9)
+        let m = (stick.x * stick.x + stick.y * stick.y).squareRoot()
+        guard m > zone, m > 0 else { return .centre }
+        let scaled = min(1, (m - zone) / (1 - zone))
+        return AnalogStick(x: stick.x / m * scaled, y: stick.y / m * scaled)
+    }
+
+    private func storeStick(player: Int?, _ s: AnalogStick) {
+        switch player {
+        case 0?: latch?.padStick.store(InputLatch.pack(s), ordering: .relaxed)
+        case 1?: latch?.player2Stick.store(InputLatch.pack(s), ordering: .relaxed)
+        default: break
+        }
+    }
+
     // MARK: reading
 
     static func pressed(_ g: GCExtendedGamepad) -> Set<PhysicalInput> {
@@ -194,6 +215,8 @@ final class GamepadHub {
         if g.buttonMenu.isPressed { s.insert(.buttonMenu) }
         if g.buttonOptions?.isPressed == true { s.insert(.buttonOptions) }
         if g.buttonHome?.isPressed == true { s.insert(.buttonHome) }
+        s.formUnion(InputMapper.rightStickInputs(x: Double(g.rightThumbstick.xAxis.value),
+                                                 y: Double(g.rightThumbstick.yAxis.value)))
         return s
     }
 
@@ -259,6 +282,7 @@ final class GamepadHub {
         tapUntil[id] = taps
         let player = pads.first { $0.id == id }?.player
         store(player: player, bits: r.buttons.sanitised)
+        if !mapping.stickAsDpad { storeStick(player: player, Self.shapedStick(stick, deadZone: mapping.stickDeadZone)) }
         let before = activeHotkeys[id] ?? []
         for h in r.hotkeys.subtracting(before) { onHotkey?(h, true) }
         for h in before.subtracting(r.hotkeys) { onHotkey?(h, false) }

@@ -18,9 +18,12 @@ Fable review changes in §10) and `docs/research.md` (App Store 4.7, core licens
   (MPL-2.0, vendored unmodified in `Packages/CoreKit/Sources/MGBA/mgba`, any change must go in
   `ThirdParty/mgba/patches/` and be published); SNES and Mega Drive are ares (ISC, vendored unmodified in
   `Sources/ARES/ares`, our stand-ins in `glue/shim`); DS is melonDS (GPL-3.0, vendored unmodified in
-  `Sources/MELONDS/melonds`, shims/stubs/build units in `glue`, patches would go in `ThirdParty/melonds/patches/`). Licence texts: `Licenses/` (repo) and
+  `Sources/MELONDS/melonds`, shims/stubs/build units in `glue`, patches would go in `ThirdParty/melonds/patches/`); N64 is
+  mupen64plus-core + rsp-hle (GPL-2.0-or-later, vendored unmodified in `Sources/MUPEN64/mupen64plus-core` and `rsp-hle`,
+  our front end/plugins/shims in `glue`, patches would go in `ThirdParty/mupen64/patches/`). **GLideN64 is GPL-2.0-only
+  (no "or later") and must not be vendored** (`ThirdParty/mupen64/README.md`). Licence texts: `Licenses/` (repo) and
   `App/Resources/Licences/` (shown in About). Keep both in sync when a component is added.
-- **Core plan:** N64 (mupen64plus + GLideN64 + rsp-hle) and DS (melonDS, own FreeBIOS) first, then PS1
+- **Core plan:** N64 (mupen64plus + rsp-hle; the RDP renderer is still open, GLideN64 is out on licence) and DS (melonDS, own FreeBIOS) first, then PS1
   (PCSX-ReARMed, HLE BIOS), PSP (PPSSPP, no JIT), then small systems (Mednafen, Stella). GameCube/Wii is a
   post-v1 goal (`docs/gamecube-wii-feasibility.md`). Upstream sources are cloned into `ThirdParty-src/` (gitignored).
   Systems needing a BIOS must use an HLE/free replacement; never ship or point to Nintendo/Sony firmware.
@@ -38,15 +41,17 @@ Fable review changes in §10) and `docs/research.md` (App Store 4.7, core licens
 - XcodeGen: `project.yml`. Never hand-edit `DuoEmulator.xcodeproj` (gitignored): `xcodegen generate`.
 - DuoKit `github.com/gogs1998/iqlabs-duokit` from 0.1.2 (don't fork; gaps go in `docs/DUOKIT-GAPS.md`).
 - CoreKit: local package `Packages/CoreKit` (targets CoreKit, NESCore, GBCore, MGBA + GBACore, ARES + AresCore,
-  MELONDS + DSCore;
+  MELONDS + DSCore, MUPEN64 + N64Core;
   Swift cores build `-Ounchecked -enforce-exclusivity=unchecked`, C/C++ at -O2, even in Debug).
-  ares keeps one console in process globals: one SNES/MD core per process (EmulatorSession's `coreGate`).
+  ares and mupen64plus keep one console in process globals: one SNES/MD/N64 core per process (EmulatorSession's
+  `coreGate`; `N64System.init` throws while another is alive).
   Tests run on the Mac:
   `cd Packages/CoreKit && swift test --scratch-path ../../build/corekit`
 - Test ROMs: `python3 Tools/build_test_roms.py` (NES, own 6502 assembler `Tools/asm6502.py`, art in
   `Tools/chrart.py`), `python3 Tools/build_gb_roms.py` (GB, `Tools/asm_sm83.py`), `Tools/build_gba_roms.py`,
   `Tools/build_ares_roms.py` (SNES + MD, hand-assembled), `Tools/build_ds_roms.py` (DS cart: ARM9 + ARM7 code via the
-  ARM encoder in `build_gba_roms.py`, logo area zero).
+  ARM encoder in `build_gba_roms.py`, logo area zero), `Tools/build_n64_roms.py` (N64 .z64: own MIPS assembler, own
+  boot stub in the IPL3 area, no Nintendo code).
 - Accuracy suites (approved, gitignored, never bundled) in `TestSuites/`; harness and how to run: `docs/accuracy.md`.
 - Our test-ROM outputs in `TestROMs/build/` are committed. A Debug-only build phase copies them into the app as `TestCarts/`;
   Release strips them and fails the build if any ROM file is in the bundle.
@@ -81,6 +86,15 @@ Fable review changes in §10) and `docs/research.md` (App Store 4.7, core licens
   screen over touch screen); mono 48 kHz from melonDS's own resampler (the Decimator only downsamples);
   savestates are melonDS's (~4.5 MB); battery = cartridge save memory (nil until the game writes it).
   DSi mode, Wi-Fi networking, OpenGL, GDB stub are not vendored (`ThirdParty/melonds/README.md`).
+- `N64Core`: `N64System` over `Sources/MUPEN64/glue` (C API `Mupen64Glue.h`). The core's own loop runs on a private
+  thread parked at every vertical interrupt (inside our video plugin's UpdateScreen); plugins linked statically via
+  our `osal_dynlib_getproc` tables (rsp-hle renamed `rsphle_*` by `glue/units`); cached interpreter, HLE boot,
+  `RandomizeInterrupt` off. Video = VI scan-out of RDRAM to 320x240 (no RDP renderer yet: commercial games' graphics
+  don't show). Audio: AI samples → linear resample to 48 kHz mono in the glue (the Decimator can't upsample).
+  Input: `InputState` gained `.z`, `.cUp/.cDown/.cLeft/.cRight`; the stick is `EmulatorCore.setAnalog(_:player:)`
+  (`AnalogStick`, defaulted no-op) fed from `InputLatch.touchStick/padStick/player2Stick`. States = mupen64plus's
+  gzip savestate (taken at the frame boundary); battery = "N64B" blob of the EEPROM/SRAM/FlashRAM/Controller Pak
+  files. `CoreFactory.n64ByteOrder/n64Normalised` handle .z64/.v64/.n64. `mupen64plus.ini` is an N64Core resource.
 - App (`App/`): `RootView` (DuoStageReader → Library or Player), `GameStore` (Documents/Games|Saves|States,
   `.library.json`, Inbox scan, import with header detection), `EmulatorSession` (dedicated thread owns the
   core, built on that thread; commands via Mutex; self-paced with ±0.5 % dynamic rate control from the audio
@@ -92,7 +106,9 @@ Fable review changes in §10) and `docs/research.md` (App Store 4.7, core licens
   controller drawing), `PlayerView` (table / book / portrait / landscape arrangements; DS ones in
   `DSPlayerView`: `GameScreen(crop:)` per screen, `DSTouchPad` only on the touch screen's rect →
   `InputLatch.stylus`; DS table controls in areas `dsTableLeft/Right/Below` around the touch screen,
-  defaults in `DSLayouts.swift`), `PlayerMenu`,
+  defaults in `DSLayouts.swift`; N64 defaults in `N64Layouts.swift`: `.stick` control kind, `StickMath` in
+  `TouchSurface.swift`, stick settings (range, dead zone, outer ring, re-centre) in `ControlSettings` and the editor
+  panel; landscape editor keeps controls off the game rect), `PlayerMenu`,
   `LibraryView` (+ `GameCard`, generated labels).
 
 ## DEBUG launch arguments

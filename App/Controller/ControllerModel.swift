@@ -16,6 +16,8 @@ struct Control: Identifiable, Hashable, Codable {
         case menu
         case fastForward
         case rewind
+        /// A true analog thumbstick (Nintendo 64). Its tuning lives in `ControlSettings`.
+        case stick
     }
 
     enum Tone: Hashable, Codable { case ember, sand }
@@ -40,6 +42,7 @@ struct Control: Identifiable, Hashable, Codable {
         } else {
             switch kind {
             case .dpad: self.haptic = 0.4
+            case .stick: self.haptic = 0
             case .menu, .fastForward, .rewind, .pill: self.haptic = 0.45
             default: self.haptic = 0.6
             }
@@ -65,6 +68,7 @@ struct Control: Identifiable, Hashable, Codable {
         case .menu: "menu"
         case .fastForward: "ff"
         case .rewind: "rewind"
+        case .stick: "stick"
         }
     }
 
@@ -73,6 +77,7 @@ struct Control: Identifiable, Hashable, Codable {
         var r: CGRect
         switch kind {
         case .dpad: r = frame.insetBy(dx: -frame.width * 0.3, dy: -frame.height * 0.3)
+        case .stick: r = frame.insetBy(dx: -frame.width * 0.12, dy: -frame.height * 0.12)
         case .face: r = frame.insetBy(dx: -frame.width * 0.28, dy: -frame.height * 0.28)
         case .combo: return frame   // sits between buttons: no expansion into them
         case .pill: r = frame.insetBy(dx: -8, dy: -12)
@@ -109,6 +114,12 @@ final class ControllerModel {
     private(set) var menuDown = false
     private(set) var fastForwardDown = false
     private(set) var rewindDown = false
+    /// The touch stick: its output (each axis -1...1, up positive), where the knob is drawn and
+    /// where its base sits (offsets in points from the control's centre; the base moves when the
+    /// stick re-centres under the thumb).
+    private(set) var stickValue = AnalogStick.centre
+    private(set) var stickKnob: CGVector = .zero
+    private(set) var stickBase: CGVector = .zero
     var hapticsEnabled = true
     /// From the layout in use: diagonal sector width, D-pad dead zone, per-button haptics.
     private(set) var settings = ControlSettings()
@@ -119,6 +130,8 @@ final class ControllerModel {
     #if DEBUG
     /// Every button the touch layer has pressed this session (UI tests read it).
     private(set) var everPressed: InputState = []
+    /// The furthest the touch stick has been pushed this session (UI tests read it).
+    private(set) var stickPeak = AnalogStick.centre
     #endif
 
     @ObservationIgnored weak var latch: InputLatch?
@@ -140,9 +153,10 @@ final class ControllerModel {
         for c in controls where !c.isHidden {
             switch c.kind {
             case .dpad: dpadHaptic = c.haptic
+            case .stick: break
             case .menu, .fastForward, .rewind: keyHaptic = c.haptic
             default:
-                for bit in 0..<12 where c.buttons.contains(InputState(rawValue: 1 << bit)) {
+                for bit in 0..<Self.buttonBits where c.buttons.contains(InputState(rawValue: 1 << bit)) {
                     table[1 << UInt32(bit)] = max(table[1 << UInt32(bit)] ?? 0, c.haptic)
                 }
                 if c.autoFire { fire.formUnion(c.buttons) }
@@ -153,13 +167,27 @@ final class ControllerModel {
         latch?.autoFireHalfPeriod.store(max(1, Int((60 / (2 * newSettings.autoFireHz)).rounded())), ordering: .relaxed)
     }
 
+    /// InputState bits a touch control can press (up to the Nintendo 64's C buttons).
+    static let buttonBits = 17
+
+    /// The touch stick moved (or was released: `.centre`, zero offsets).
+    func updateStick(_ value: AnalogStick, knob: CGVector, base: CGVector) {
+        if value != stickValue { stickValue = value }
+        #if DEBUG
+        if value.x * value.x + value.y * value.y > stickPeak.x * stickPeak.x + stickPeak.y * stickPeak.y { stickPeak = value }
+        #endif
+        if knob != stickKnob { stickKnob = knob }
+        if base != stickBase { stickBase = base }
+        latch?.touchStick.store(InputLatch.pack(value), ordering: .relaxed)
+    }
+
     func update(pressed newPressed: InputState, dpad: CGVector, menu: Bool, fastForward: Bool, rewind: Bool) {
         let added = newPressed.subtracting(pressed)
         let dpadBits: InputState = [.up, .down, .left, .right]
         if hapticsEnabled && settings.hapticLevel > 0 {
             let buttons = added.subtracting(dpadBits)
             var strength = 0.0
-            for bit in 0..<12 where buttons.contains(InputState(rawValue: 1 << bit)) {
+            for bit in 0..<Self.buttonBits where buttons.contains(InputState(rawValue: 1 << bit)) {
                 strength = max(strength, hapticByButton[1 << UInt32(bit)] ?? 0.6)
             }
             if strength > 0 {
@@ -191,6 +219,7 @@ final class ControllerModel {
         if rewindDown { onRewind?(false) }
         pressed = []
         dpadVector = .zero
+        updateStick(.centre, knob: .zero, base: .zero)
         menuDown = false
         fastForwardDown = false
         rewindDown = false
@@ -207,6 +236,46 @@ struct ControlSettings: Codable, Hashable {
     var autoFireHz: Double = 10
     /// Master haptic strength multiplier (0 = off).
     var hapticLevel: Double = 1
+    /// Analog stick (Nintendo 64): the fraction of the stick's radius that gives full deflection
+    /// (lower = more sensitive), the fraction near the centre that does nothing, an outer ring
+    /// beyond the base where a touch is always full deflection, and whether the stick's centre
+    /// moves to wherever the thumb lands.
+    var stickRange: Double = 0.8
+    var stickDeadZone: Double = 0.06
+    var stickOuterRing = false
+    var stickRecentre = false
+
+    init(diagonalDegrees: Double = 36, deadZone: Double = 0.15, autoFireHz: Double = 10, hapticLevel: Double = 1,
+         stickRange: Double = 0.8, stickDeadZone: Double = 0.06, stickOuterRing: Bool = false, stickRecentre: Bool = false) {
+        self.diagonalDegrees = diagonalDegrees
+        self.deadZone = deadZone
+        self.autoFireHz = autoFireHz
+        self.hapticLevel = hapticLevel
+        self.stickRange = stickRange
+        self.stickDeadZone = stickDeadZone
+        self.stickOuterRing = stickOuterRing
+        self.stickRecentre = stickRecentre
+    }
+
+    // Tolerant decoding: layouts saved before a setting existed still load, with its default.
+    private enum CodingKeys: String, CodingKey {
+        case diagonalDegrees, deadZone, autoFireHz, hapticLevel, stickRange, stickDeadZone, stickOuterRing, stickRecentre
+    }
+
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = ControlSettings.defaults
+        diagonalDegrees = try c.decodeIfPresent(Double.self, forKey: .diagonalDegrees) ?? d.diagonalDegrees
+        deadZone = try c.decodeIfPresent(Double.self, forKey: .deadZone) ?? d.deadZone
+        autoFireHz = try c.decodeIfPresent(Double.self, forKey: .autoFireHz) ?? d.autoFireHz
+        hapticLevel = try c.decodeIfPresent(Double.self, forKey: .hapticLevel) ?? d.hapticLevel
+        stickRange = try c.decodeIfPresent(Double.self, forKey: .stickRange) ?? d.stickRange
+        stickDeadZone = try c.decodeIfPresent(Double.self, forKey: .stickDeadZone) ?? d.stickDeadZone
+        stickOuterRing = try c.decodeIfPresent(Bool.self, forKey: .stickOuterRing) ?? d.stickOuterRing
+        stickRecentre = try c.decodeIfPresent(Bool.self, forKey: .stickRecentre) ?? d.stickRecentre
+    }
+
+    private static let defaults = ControlSettings()
 
     /// Values from a file are clamped before use (a shared layout can't crash or break the pad).
     var sanitised: ControlSettings {
@@ -215,6 +284,8 @@ struct ControlSettings: Codable, Hashable {
         s.deadZone = deadZone.isFinite ? min(0.5, max(0.05, deadZone)) : 0.15
         s.autoFireHz = autoFireHz.isFinite ? min(30, max(2, autoFireHz)) : 10
         s.hapticLevel = hapticLevel.isFinite ? min(1, max(0, hapticLevel)) : 1
+        s.stickRange = stickRange.isFinite ? min(1, max(0.4, stickRange)) : 0.8
+        s.stickDeadZone = stickDeadZone.isFinite ? min(0.4, max(0, stickDeadZone)) : 0.06
         return s
     }
 }
@@ -324,6 +395,7 @@ enum ControllerLayout {
 
     /// The full handheld controller (Duo table pose bottom half, or below the game in portrait).
     static func deck(_ size: CGSize, system: SystemID, sixButton: Bool = false, preset: LayoutPreset = .standard) -> [Control] {
+        if system == .n64 { return N64Layout.deck(size) }
         let w = size.width, h = size.height
         let shoulderSpace: CGFloat = hasShoulders(system, preset: preset) ? 40 : 0
         let usableH = h - shoulderSpace
@@ -359,6 +431,7 @@ enum ControllerLayout {
 
     /// Book pose, left page: the D-pad under the game (and L).
     static func bookLeft(_ size: CGSize, system: SystemID, sixButton: Bool = false, preset: LayoutPreset = .standard) -> [Control] {
+        if system == .n64 { return N64Layout.bookLeft(size) }
         let w = size.width, h = size.height
         let dpad = min(w * 0.52, h * 0.85)
         let pillW: CGFloat = 60
@@ -375,6 +448,7 @@ enum ControllerLayout {
 
     /// Book pose, right page: face buttons and Start (and R).
     static func bookRight(_ size: CGSize, system: SystemID, sixButton: Bool = false, preset: LayoutPreset = .standard) -> [Control] {
+        if system == .n64 { return N64Layout.bookRight(size) }
         let w = size.width, h = size.height
         let face = min(w * 0.2, h * 0.34)
         var c = [Control(kind: .pill(.start, "START"), frame: CGRect(x: 18, y: h * 0.5 - 10, width: 60, height: 20))]
@@ -393,6 +467,7 @@ enum ControllerLayout {
     /// Landscape phone: controls in the margins either side of the game.
     static func overlay(_ size: CGSize, gameRect: CGRect, system: SystemID, sixButton: Bool = false,
                         preset: LayoutPreset = .standard) -> [Control] {
+        if system == .n64 { return N64Layout.overlay(size, gameRect: gameRect) }
         let w = size.width, h = size.height
         let side = max(120, gameRect.minX)
         let dpad = min(side * 0.82, h * 0.42)
