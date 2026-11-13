@@ -35,8 +35,8 @@ struct AboutView: View {
         NavigationStack {
             List {
                 Section {
-                    Text("Foldback plays games you own. It includes no games and no console system software, and never downloads any.")
-                    Text("Foldback is not affiliated with, endorsed or sponsored by Nintendo or Sega. Console names are trademarks of their owners and are used only to say which game files the app can open.")
+                    Text("Relics: Games plays games you own. It includes no games and no console system software, and never downloads any.")
+                    Text("Relics: Games is not affiliated with, endorsed or sponsored by Nintendo or Sega. Console names are trademarks of their owners and are used only to say which game files the app can open.")
                         .foregroundStyle(.secondary)
                 }
                 Section("Our own work") {
