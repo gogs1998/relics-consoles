@@ -1,6 +1,7 @@
 # HANDOFF: Duo Emulator ("Foldback")
 
 ## Update, 13 Nov 2026 (build 6: big N64 deck, C stick option, bigger C buttons)
+**Build 6 uploaded to TestFlight** (internal only, archive CFBundleVersion 6; never submitted for review).
 Gordon asked "did n64 not have 2 sticks" after trying build 5, then sent a rival's portrait layout he likes.
 - **New N64 deck** (portrait and Duo table, `N64Layout.deck`): the layout ideas only, in our own Graphite/Ember (no console
   colours). L and R are wide tabs in the top corners, with rewind / menu / fast-forward small between them. The stick is
@@ -23,9 +24,13 @@ Gordon asked "did n64 not have 2 sticks" after trying build 5, then sent a rival
   33.7 → 41 (the only deck under 44); landscape 852-wide 33.5 → 44, 667-wide (SE) 21 → 32 (the margin is ~103 pt);
   book right page 422x140 29.5 → 44, 260x120 24 → 39. Book and landscape fit the cluster with a small solver
   (`fitCluster` / `cameraControls`: from 44 pt down to the old size, nudged until nothing touches).
-- **Tests:** app unit tests for the C-stick mapping (thresholds, hysteresis, diagonals, release), camera swap, old
+- **Saved layouts:** anyone with a saved N64 portrait/table layout from build 5 keeps it (Z still a shoulder there)
+  until they tap Reset in the editor; new players get the new deck.
+- **Tests:** app unit tests (33 pass) for the C-stick mapping (thresholds, hysteresis, diagonals, release), camera swap, old
   layouts, option resolution, sizes; N64 UI tests for the C stick in portrait/table/landscape/book and the editor
-  switch. **Simulator only** (Shared iPhone 17e; N64 shows through the VI fallback): shots `docs/shots/iphone-n64.png`,
+  switch. The C-stick UI tests don't assert the press: XCUITest kept reading a stale `debug.touchInput` after a drag
+  on it, though the app's `everPressed` did hold C up + C right (checked by log and a mid-drag screenshot with both
+  arrows lit). Release device check: zero warnings. **Simulator only** (Shared iPhone 17e; N64 shows through the VI fallback): shots `docs/shots/iphone-n64.png`,
   `iphone-n64-cstick.png`, `table-n64.png`, `table-n64-cstick.png`, `iphone-landscape-n64.png`,
   `iphone-landscape-n64-cstick.png`, `book-n64.png`, `book-n64-cstick.png`, `editor-n64-cstick.png`. **Needs
   Gordon's device:** how the C stick feels for the camera, whether 40 %/30 % is right, and thumb reach on the new deck.
