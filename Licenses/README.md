@@ -14,6 +14,10 @@ These third-party components are compiled into the app:
 | FreeBIOS (inside melonDS) | the DS's ARM9/ARM7 BIOS, an independent replacement (no Nintendo code) | BSD-2-Clause (`FreeBIOS-BSD-2-Clause.txt`) | via melonDS (`freebios/`) | No |
 | mupen64plus-core (commit daae68e) | Nintendo 64 core (cached interpreter, HLE boot, no PIF ROM) and its ROM database `mupen64plus.ini` (save types; no game data) | GPL-2.0-or-later (`mupen64plus-GPL-2.0-or-later.txt`) | https://github.com/mupen64plus/mupen64plus-core | No (unmodified files in `Packages/CoreKit/Sources/MUPEN64/mupen64plus-core`; our front end, plugins and stand-ins in `Sources/MUPEN64/glue`; see `ThirdParty/mupen64/README.md`) |
 | mupen64plus-rsp-hle (commit 4cdc305) | the N64's RSP, high-level (audio and other microcode tasks) | GPL-2.0-or-later (same file) | https://github.com/mupen64plus/mupen64plus-rsp-hle | No (`Sources/MUPEN64/rsp-hle`) |
+| paraLLEl-RDP (parallel-rdp-standalone commit 388d70f) with Granite's Vulkan backend and volk | Nintendo 64 graphics (RDP) in Vulkan compute shaders on the GPU | MIT (`paraLLEl-RDP-MIT.txt`) | https://github.com/Themaister/parallel-rdp-standalone | No (unmodified files in `Packages/CoreKit/Sources/MUPEN64/parallel-rdp`; our build units and glue in `Sources/MUPEN64/glue/rdp`) |
+| Vulkan-Headers (inside paraLLEl-RDP and MoltenVK) | Vulkan API declarations | Apache-2.0 (`MoltenVK-Apache-2.0-and-bundled.txt`) | https://github.com/KhronosGroup/Vulkan-Headers | No |
+| MoltenVK v1.4.2 (prebuilt static library), incl. SPIRV-Cross and cereal | Vulkan on Metal for the N64 renderer (iPhone/iPad builds) | Apache-2.0; cereal BSD-3-Clause (`MoltenVK-Apache-2.0-and-bundled.txt`) | https://github.com/KhronosGroup/MoltenVK | No (`ThirdParty/moltenvk`, the release's unmodified `libMoltenVK.a`) |
+| cxd4 RSP interpreter (mupen64plus-rsp-cxd4 commit b8e747b) | the N64's RSP for graphics microcode (low-level) | CC0 1.0 (`cxd4-CC0-1.0.txt`); its `osal_dynamiclib.h` GPL-2.0-or-later | https://github.com/mupen64plus/mupen64plus-rsp-cxd4 | No (unmodified files in `Sources/MUPEN64/rsp-cxd4`; build unit `glue/rdp/cxd4_unit.c` disables its signal-handler and `srand` calls with macros) |
 | MiniZip, MD5, xxHash, CIC-NUS-6105 algorithm (inside mupen64plus-core) | zip states, ROM hashing, the 6105 cartridge challenge | zlib, zlib-style, BSD-2-Clause, BSD-2-Clause (`mupen64plus-bundled.txt`) | via mupen64plus-core | No |
 | xxHash, FatFs headers, tiny-AES-c headers, blip_buf (inside melonDS) | hashing, declarations, audio resampler | BSD-2-Clause, FatFs (1-clause), Unlicense, LGPL-2.1-or-later (`melonDS-bundled.txt`) | via melonDS | No |
 
@@ -22,7 +26,8 @@ These third-party components are compiled into the app:
 Five freely licensed homebrew games ship as separate game files in `App/Resources/Demos/` and are copied onto the
 shelf on first launch (deletable, never re-seeded). Each is the author's unmodified build. Credits, notices and
 source locations: `demos-credits.txt`; full texts `GPL-3.0.txt` and `CC-BY-SA-4.0.txt`. The Release ROM check in
-`project.yml` allows exactly these five files (by name and SHA-256).
+`project.yml` allows exactly these five files plus our own N64 speed-test ROM
+(`CoreKit_N64Core.bundle/n64_rdpbench.z64`, built by `Tools/build_n64_bench_rom.py`), by name and SHA-256.
 
 | Demo | System | Author | Licence | Source |
 |---|---|---|---|---|
@@ -39,3 +44,6 @@ Acknowledgements screen.
 License version 2" with no "or later" option (its LICENSE file; its source files carry no licence
 header), which cannot be combined into a GPLv3 app. It is not vendored. See `ThirdParty/mupen64/README.md`. The app as a whole is GPLv3 (Gordon, 11 Nov 2026), which melonDS requires; every
 other component's licence is GPLv3-compatible. No non-commercial or no-derivatives code is included.
+
+**Apache-2.0 and the GPL:** MoltenVK and Vulkan-Headers are Apache-2.0, which is compatible with GPLv3 but not
+GPLv2, so the app including its N64 part (mupen64plus: GPL-2.0-or-later) is distributed under GPLv3.

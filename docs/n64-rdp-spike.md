@@ -11,9 +11,16 @@ load on A15-A18 Pro, and 50-75 fps for the stress load. **Recommendation: v2, pr
 on-device run (below) confirms the estimate. The bottleneck is the CPU side (R4300 interpreter + RSP interpreter),
 not the GPU.
 
-Throwaway spike: nothing here is wired into the shipping app. The only shipping file touched is
-`Packages/CoreKit/Sources/MUPEN64/glue/src/n64_glue.c`, and only inside `#ifdef N64_RDP_SPIKE`, which CoreKit and the
-app never define. Release check build: passes, zero warnings. CoreKit N64 tests: 8/8 pass.
+The first spike commit kept everything out of the shipping app; build 4 (update below) wires the bench in.
+
+> **Update (build 4, 13 Nov 2026):** Gordon can't cable his iPhone (18 Pro Max), so the bench now ships inside
+> the main app instead of the separate N64Bench app: **About › long-press the version line (1 s) › N64 speed
+> test › Start**, then **Share report**. paraLLEl-RDP and cxd4 are vendored unmodified in
+> `Packages/CoreKit/Sources/MUPEN64/parallel-rdp` and `rsp-cxd4` and built through `glue/rdp`; MoltenVK's
+> device library is in `ThirdParty/moltenvk` and linked for device builds only; the ROM is an N64Core resource
+> (built by `Tools/build_n64_bench_rom.py`, allowed by name + SHA-256 in the Release ROM check). cxd4's SIGSEGV
+> probe, SIGILL handler and `srand` are neutralised in `glue/rdp/cxd4_unit.c`. N64 games stay Debug-only;
+> the N64Bench project and §8's cable steps are superseded. The Mac CLI remains (`Spikes/N64RDP/build_mac.sh`).
 
 ## 1. Licences (checked from the downloaded files)
 
@@ -203,7 +210,7 @@ git clone --depth 1 https://github.com/mupen64plus/mupen64plus-rsp-cxd4.git     
 # MoltenVK v1.4.2: MoltenVK-ios.tar → moltenvk/MoltenVK/{LICENSE,MoltenVK/static,MoltenVK/include/MoltenVK};
 #                  MoltenVK-macos.tar's MoltenVK/MoltenVK/dynamic/dylib/macOS/libMoltenVK.dylib → moltenvk/macos/
 cd ..
-python3 Spikes/N64RDP/rom/build_rdpbench_rom.py
-Spikes/N64RDP/build_mac.sh
-N64RDP_ROOT=$PWD build/n64rdp-spike/mac/n64rdp_bench Spikes/N64RDP/rom/n64_rdpbench.z64 [--async] [--ppm frame.ppm]
+python3 Tools/build_n64_bench_rom.py      # then update its SHA-256 in project.yml's Release ROM check
+Spikes/N64RDP/build_mac.sh                # needs only ThirdParty-src/moltenvk/macos/libMoltenVK.dylib now
+N64RDP_ROOT=$PWD build/n64rdp-spike/mac/n64rdp_bench Packages/CoreKit/Sources/N64Core/Resources/n64_rdpbench.z64 [--async] [--ppm frame.ppm]
 ```

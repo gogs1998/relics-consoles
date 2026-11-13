@@ -3,6 +3,7 @@ import SwiftUI
 /// About: what the app is (and isn't), the non-affiliation line, and the licences.
 struct AboutView: View {
     @Environment(\.dismiss) private var dismiss
+    @State private var showSpeedTest = false
 
     private struct Licence: Identifiable {
         let id: String
@@ -27,6 +28,15 @@ struct AboutView: View {
                 file: "Licence-mupen64plus-GPL-2.0-or-later"),
         Licence(id: "mupen64plus-bundled", title: "MiniZip, MD5, xxHash, CIC-NUS-6105", detail: "Parts of mupen64plus · zlib, BSD 2-Clause",
                 file: "Licence-mupen64plus-bundled"),
+        Licence(id: "parallel-rdp", title: "paraLLEl-RDP, Granite and volk",
+                detail: "Nintendo 64 graphics (RDP) on the GPU · MIT · unmodified copies of parallel-rdp-standalone commit 388d70f (github.com/Themaister/parallel-rdp-standalone) and the volk loader it bundles (github.com/zeux/volk)",
+                file: "Licence-paraLLEl-RDP-MIT"),
+        Licence(id: "moltenvk", title: "MoltenVK, SPIRV-Cross, cereal and Vulkan-Headers",
+                detail: "Vulkan on Metal for the N64 graphics · Apache-2.0 (MoltenVK v1.4.2, SPIRV-Cross, Vulkan-Headers), BSD 3-Clause (cereal) · github.com/KhronosGroup/MoltenVK",
+                file: "Licence-MoltenVK-Apache-2.0-and-bundled"),
+        Licence(id: "cxd4", title: "cxd4 RSP interpreter",
+                detail: "Nintendo 64 RSP for graphics tasks · CC0 1.0 (public domain dedication) by Iconoclast · an unmodified copy of mupen64plus-rsp-cxd4 commit b8e747b (github.com/mupen64plus/mupen64plus-rsp-cxd4)",
+                file: "Licence-cxd4-CC0-1.0"),
         Licence(id: "gpl3", title: "GNU GPL 3.0", detail: "The licence of the app as a whole, of melonDS and of the GPL demos",
                 file: "Licence-GPL-3.0"),
         Licence(id: "ccbysa", title: "CC BY-SA 4.0", detail: "The licence of µCity's and Alex vs Bus's graphics and music",
@@ -59,13 +69,30 @@ struct AboutView: View {
                 Section("Privacy") {
                     Text("No accounts, no ads, no analytics. Nothing leaves your device.")
                 }
+                Section {
+                    // Long-press opens the hidden N64 speed test (N64SpeedTestView).
+                    Text(versionLine)
+                        .font(.rounded(.footnote))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                        .onLongPressGesture(minimumDuration: 1) { showSpeedTest = true }
+                        .accessibilityAction(named: "N64 speed test") { showSpeedTest = true }
+                }
             }
+            .navigationDestination(isPresented: $showSpeedTest) { N64SpeedTestView() }
             .navigationTitle("About")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
         }
         .preferredColorScheme(.dark)
+    }
+
+    private var versionLine: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
+        return "Version \(version) (\(build))"
     }
 
     private func licenceLink(_ l: Licence) -> some View {

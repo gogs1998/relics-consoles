@@ -5,7 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "n64bench.h"
+#include "N64BenchGlue.h"
 
 static const char* g_ppm;
 static int g_shots;

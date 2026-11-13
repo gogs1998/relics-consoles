@@ -91,6 +91,19 @@ let mupenC: [CSetting] = [
     // Optimised even in Debug (like the other cores); upstream's own warnings are not ours to fix.
     .unsafeFlags(["-O2", "-w", "-fno-strict-aliasing"]),
 ]
+// paraLLEl-RDP (MIT; with Granite's Vulkan backend, volk and Vulkan-Headers) vendored unmodified in
+// Sources/MUPEN64/parallel-rdp, and cxd4's RSP interpreter (CC0) vendored unmodified in Sources/MUPEN64/rsp-cxd4.
+// Both are compiled only through our build units in glue/rdp (see glue/rdp/n64_rdp.h). MoltenVK (Apache-2.0) is
+// linked by the app for iPhone/iPad builds (ThirdParty/moltenvk); elsewhere the RDP layer finds no Vulkan and the
+// glue falls back to VI scan-out.
+let parallelRdpPaths: [String] = ["parallel-rdp/parallel-rdp", "parallel-rdp/volk", "parallel-rdp/vulkan",
+                                  "parallel-rdp/vulkan-headers/include", "parallel-rdp/util"]
+let mupenRdpC: [CSetting] = mupenC + parallelRdpPaths.map { .headerSearchPath($0) }
+let mupenRdpCXX: [CXXSetting] = (parallelRdpPaths + ["glue/include", "mupen64plus-core/src", "mupen64plus-core/src/api"])
+    .map { .headerSearchPath($0) } + [
+    .define("NDEBUG"),
+    .unsafeFlags(["-O2", "-w"]),
+]
 
 let package = Package(
     name: "CoreKit",
@@ -117,10 +130,12 @@ let package = Package(
         .target(name: "DSCore", dependencies: ["CoreKit", "MELONDS"], swiftSettings: fast),
         .target(name: "MUPEN64", exclude: mupenExcluded,
                 sources: ["mupen64plus-core/src", "mupen64plus-core/subprojects", "rsp-hle/src", "glue/src",
-                          "glue/units"],
-                publicHeadersPath: "glue/include", cSettings: mupenC, linkerSettings: [.linkedLibrary("z")]),
+                          "glue/units", "glue/rdp"],
+                publicHeadersPath: "glue/include", cSettings: mupenRdpC, cxxSettings: mupenRdpCXX,
+                linkerSettings: [.linkedLibrary("z")]),
         .target(name: "N64Core", dependencies: ["CoreKit", "MUPEN64"],
-                resources: [.copy("Resources/mupen64plus.ini")], swiftSettings: fast),
+                resources: [.copy("Resources/mupen64plus.ini"), .copy("Resources/n64_rdpbench.z64")],
+                swiftSettings: fast),
         .testTarget(name: "CoreKitTests",
                     dependencies: ["CoreKit", "NESCore", "GBCore", "GBACore", "AresCore", "DSCore", "N64Core"]),
     ],

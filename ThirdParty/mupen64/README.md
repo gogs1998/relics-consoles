@@ -304,3 +304,13 @@ the one firmware-adjacent file.
 | `rsp-hle/src/plugin.c` | 17466 | GPL-2.0-or-later |
 | `rsp-hle/src/re2.c` | 8431 | GPL-2.0-or-later |
 | `rsp-hle/src/ucodes.h` | 5086 | GPL-2.0-or-later |
+
+## Update, 13 Nov 2026: paraLLEl-RDP + cxd4 are in (build 4)
+
+The renderer is now **paraLLEl-RDP** (MIT, `Sources/MUPEN64/parallel-rdp`, parallel-rdp-standalone `388d70f`) on
+**MoltenVK** v1.4.2 (Apache-2.0, `ThirdParty/moltenvk`, device builds only), with **cxd4's RSP interpreter**
+(CC0, `Sources/MUPEN64/rsp-cxd4`, `b8e747b`) for graphics tasks; rsp-hle keeps audio. All vendored unmodified,
+compiled only through our units in `glue/rdp` (cxd4: signal handlers and `srand` neutralised by macros in
+`cxd4_unit.c`; paraLLEl: `volk_rename.h` first). Without Vulkan (simulator, Mac tests) the glue still falls back
+to the VI scan-out above. Measurements: `docs/n64-rdp-spike.md`. In Release only the hidden speed test reaches it
+(About › long-press the version line); N64 games stay Debug-only (`N64_ENABLED`).

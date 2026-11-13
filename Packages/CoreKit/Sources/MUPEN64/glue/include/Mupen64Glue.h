@@ -6,8 +6,8 @@
 // call here is made from one host thread and returns with that private thread parked at a frame
 // boundary (inside the vertical interrupt), so nothing races.
 //
-// No Nintendo files are ever involved: the core's HLE boot replaces the PIF boot ROM, the RSP is
-// high-level emulated, and the CPU is the cached interpreter (no recompiler, no executable memory).
+// No Nintendo files are ever involved: the core's HLE boot replaces the PIF boot ROM, RSP audio tasks are
+// high-level emulated (graphics tasks run on cxd4's interpreter), and the CPU is the cached interpreter (no recompiler, no executable memory).
 // The plugins are linked statically: the core's dynamic-library hooks resolve against tables here.
 #ifndef MUPEN64_GLUE_H
 #define MUPEN64_GLUE_H
@@ -95,5 +95,7 @@ uint32_t n64_peek_rdram(const N64Handle* h, uint32_t address);
 #ifdef __cplusplus
 }
 #endif
+
+#include "N64BenchGlue.h"   // the hidden N64 speed test
 
 #endif
