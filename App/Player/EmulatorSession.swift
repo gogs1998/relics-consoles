@@ -142,6 +142,8 @@ final class EmulatorSession: @unchecked Sendable {
     var onStarted: (@Sendable (_ videoWidth: Int, _ videoHeight: Int, _ romCRC: UInt32, _ stateVersion: UInt32, _ players: Int) -> Void)?
     /// The core changed resolution (Mega Drive 256/320 wide, SNES hi-res).
     var onVideoSize: (@Sendable (_ videoWidth: Int, _ videoHeight: Int) -> Void)?
+    /// Something the player must be told about the machine (the N64 GPU renderer failed to start), after onStarted.
+    var onNotice: (@Sendable (String) -> Void)?
 
     // Emulation-thread state (touched only on that thread).
     private var paused = false
@@ -180,8 +182,24 @@ final class EmulatorSession: @unchecked Sendable {
         case .snes: return try SNESSystem(rom: rom, battery: battery)
         case .md: return try MDSystem(rom: rom, battery: battery)
         case .ds: return try DSSystem(rom: rom, battery: battery)
-        case .n64: return try N64System(rom: rom, battery: battery)
+        case .n64:
+            // Asynchronous RDP (only the VI waits for the GPU); the Vulkan pipeline cache persists between sessions.
+            return try N64System(rom: rom, battery: battery, pipelineCache: n64PipelineCacheURL(), synchronousRDP: false)
         }
+    }
+
+    /// Application Support/N64 Renderer/vulkan-pipelines.bin: compiled GPU pipelines for this device. Excluded from
+    /// backups (a restore onto another device couldn't use it; the file's header check would discard it anyway).
+    private static func n64PipelineCacheURL() -> URL? {
+        guard let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            return nil
+        }
+        var dir = support.appendingPathComponent("N64 Renderer", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try? dir.setResourceValues(values)
+        return dir.appendingPathComponent("vulkan-pipelines.bin")
     }
 
     private static func romCRC(_ core: any EmulatorCore, rom: Data) -> UInt32 {
@@ -209,6 +227,8 @@ final class EmulatorSession: @unchecked Sendable {
             return
         }
         onStarted?(core.videoSize.width, core.videoSize.height, Self.romCRC(core, rom: rom), core.stateVersion, core.maxPlayers)
+        if let notice = core.statusNotice { onNotice?(notice) }
+        let canRewind = core.supportsRewind
 
         var lastSize = core.videoSize
         let hasTouch = core.touchScreen != nil
@@ -226,7 +246,9 @@ final class EmulatorSession: @unchecked Sendable {
             }
             for c in pending {
                 switch c {
-                case .pause: paused = true
+                case .pause:
+                    if !paused { core.prepareForSuspend() }
+                    paused = true
                 case .resume:
                     paused = false
                     audio.clear()
@@ -236,7 +258,7 @@ final class EmulatorSession: @unchecked Sendable {
                     if s == 1 && speed != 1 { audio.clear() }
                     speed = max(1, s)
                 case .rewind(let on):
-                    rewinding = on
+                    rewinding = on && canRewind
                     if !on { audio.clear() }
                 case .saveState(let reply): reply(core.saveState())
                 case .loadState(let data, let reply):
@@ -283,7 +305,7 @@ final class EmulatorSession: @unchecked Sendable {
                 for i in 0..<speed {
                     if core.maxPlayers > 1 { core.runFrame(inputs: [held, p2]) } else { core.runFrame(input: held) }
                     frameCount += 1
-                    if frameCount % rewindInterval == 0 { pushRewind(core.saveState()) }
+                    if canRewind && frameCount % rewindInterval == 0 { pushRewind(core.saveState()) }
                     if i < speed - 1 { discardAudio(core) }
                 }
                 if speed == 1 { core.drainAudio(into: audio) } else { discardAudio(core) }
@@ -312,16 +334,13 @@ final class EmulatorSession: @unchecked Sendable {
     private func discardAudio(_ core: any EmulatorCore) { core.discardAudio() }
 
     /// Big states are snapshotted less often: GBA (~400 KB) every 15 frames, so rewind still
-    /// reaches ~15 s back; DS (~4.5 MB, mostly main RAM) every 60, which reaches ~5 s back;
-    /// Nintendo 64 every 180.
+    /// reaches ~15 s back; DS (~4.5 MB, mostly main RAM) every 60, which reaches ~5 s back.
+    /// Nintendo 64 has no rewind (`EmulatorCore.supportsRewind`): its states are too big and slow to write.
     private var rewindInterval = 4
 
     private func pushRewind(_ state: Data) {
         if state.count > 100_000 { rewindInterval = 15 }
         if state.count > 2_000_000 { rewindInterval = 60 }
-        // Nintendo 64 states are gzip files written by the core (tens of ms for a real game's
-        // 8 MB of RDRAM): snapshot every 3 s so play doesn't hitch; rewind reaches further, coarser.
-        if system == .n64 { rewindInterval = 180 }
         rewindStates.append(state)
         rewindBytes += state.count
         while rewindBytes > rewindCap, !rewindStates.isEmpty {

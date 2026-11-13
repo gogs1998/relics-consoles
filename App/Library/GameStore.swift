@@ -22,29 +22,15 @@ struct GameRecord: Codable, Identifiable, Hashable, Sendable {
     var isDemo: Bool { demo == true }
 }
 
-extension SystemID {
-    /// Systems this build lets you import and play. Nintendo 64 is Debug-only (`N64_ENABLED`)
-    /// until it has a renderer for real games.
-    var isAvailableInThisBuild: Bool {
-        #if N64_ENABLED
-        true
-        #else
-        self != .n64
-        #endif
-    }
-}
-
 enum ImportError: LocalizedError {
     case notAGame(String)
     case unreadable(String)
-    case notInThisVersion(String, SystemID)
     case zip(String, String)
 
     var errorDescription: String? {
         switch self {
-        case .notAGame(let name): "\(name) isn't a game file this app can play (NES, SNES, Game Boy, Game Boy Color, Game Boy Advance, Mega Drive or Nintendo DS)."
+        case .notAGame(let name): "\(name) isn't a game file this app can play (NES, SNES, Game Boy, Game Boy Color, Game Boy Advance, Mega Drive, Nintendo DS or Nintendo 64)."
         case .unreadable(let name): "\(name) couldn't be read."
-        case .notInThisVersion(let name, let system): "\(name) is a \(system.displayName) game. \(system.displayName) isn't available in this version yet."
         case .zip(let name, let reason): "\(name) \(reason)"
         }
     }
@@ -103,8 +89,7 @@ final class GameStore {
         guard let data = try? Data(contentsOf: indexURL),
               let list = try? JSONDecoder().decode([GameRecord].self, from: data) else { return }
         games = list.filter {
-            $0.system.isAvailableInThisBuild
-                && ($0.isBundledTestCart || FileManager.default.fileExists(atPath: romURL(for: $0).path))
+            $0.isBundledTestCart || FileManager.default.fileExists(atPath: romURL(for: $0).path)
         }
     }
 
@@ -200,7 +185,6 @@ final class GameStore {
               system == .ds || data.count <= (system == .n64 ? 64 : 32) * 1024 * 1024 else {
             throw ImportError.notAGame(name)
         }
-        guard system.isAvailableInThisBuild else { throw ImportError.notInThisVersion(name, system) }
         let id = Self.gameID(data)
         if games.contains(where: { $0.id == id }) { return false }
         let fileName = try write(data, named: name, system: system)
@@ -272,8 +256,7 @@ final class GameStore {
         for (fileName, title) in Self.demoTitles.sorted(by: { $0.key < $1.key }) {
             let url = dir.appendingPathComponent(fileName)
             guard let data = try? Data(contentsOf: url),
-                  let system = CoreFactory.detect(rom: data, fileExtension: url.pathExtension),
-                  system.isAvailableInThisBuild else { continue }
+                  let system = CoreFactory.detect(rom: data, fileExtension: url.pathExtension) else { continue }
             let id = Self.gameID(data)
             guard !seeded.contains(id) else { continue }
             seeded.insert(id)

@@ -51,24 +51,6 @@ targets:
             cp "${SRCROOT}"/TestROMs/build/*.nes "${SRCROOT}"/TestROMs/build/*.gb "${SRCROOT}"/TestROMs/build/*.gbc "${SRCROOT}"/TestROMs/build/*.gba "${SRCROOT}"/TestROMs/build/*.sfc "${SRCROOT}"/TestROMs/build/*.md "${SRCROOT}"/TestROMs/build/*.nds "${SRCROOT}"/TestROMs/build/*.z64 "${APP}/TestCarts/" 2>/dev/null || true
           else
             rm -rf "${APP}/TestCarts"
-            # Nintendo 64 is Debug-only (N64_ENABLED): the Release Info.plist must not advertise its file types.
-            /usr/bin/python3 -I - "${APP}/Info.plist" <<'PY' || exit 1
-          import plistlib, sys
-          path = sys.argv[1]
-          with open(path, "rb") as f:
-              raw = f.read()
-          fmt = plistlib.FMT_BINARY if raw.startswith(b"bplist") else plistlib.FMT_XML
-          p = plistlib.loads(raw)
-          n64 = {"com.iqlabs.duoemulator.z64", "com.iqlabs.duoemulator.n64", "com.iqlabs.duoemulator.v64"}
-          for d in p.get("CFBundleDocumentTypes", []):
-              d["LSItemContentTypes"] = [t for t in d.get("LSItemContentTypes", []) if t not in n64]
-          p["UTImportedTypeDeclarations"] = [t for t in p.get("UTImportedTypeDeclarations", []) if t.get("UTTypeIdentifier") not in n64]
-          with open(path, "wb") as f:
-              plistlib.dump(p, f, fmt=fmt)
-          left = [k for k in ("z64", "n64", "v64") if ("com.iqlabs.duoemulator." + k).encode() in plistlib.dumps(p)]
-          if left:
-              sys.exit("error: N64 document types still in the Release Info.plist: %s" % left)
-          PY
             # ROM check: the only game files allowed are the bundled homebrew demos and our own N64 speed-test ROM
             # (Tools/build_n64_bench_rom.py), by path and SHA-256.
             ALLOW=" Demos/ucity.gbc:9422ee2ca7b7ea1d46b58b2a429fff3f354dfd3e732dee1e7ae6220f148ce6e0 Demos/libbet.gb:3607412031c8287cf878299ce96e581e85b852dde703806343b95576fa3ff1a9 Demos/thwaite.nes:3543ebf804f80abb19acfde4630a909a7485e2d69487900fd93b5698c412adc5 Demos/croom.nes:6a43202f8b7793f78832c47b67ca3aeb12165140a1e38f0a5043855b2e3d53cd Demos/alexvsbus-pre3.md:1b05f681125445cfedf4cdc0819a79c9d372d5dc198cc36afbd61d6876161be1 CoreKit_N64Core.bundle/n64_rdpbench.z64:3dc16cfe0003ad2d555d9b6be97e6a64fccdd8a5382b37829310e66df1615c02 "
@@ -95,15 +77,11 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1,2"
         MARKETING_VERSION: "0.1"
-        CURRENT_PROJECT_VERSION: "4"
+        CURRENT_PROJECT_VERSION: "5"
         ENABLE_USER_SCRIPT_SANDBOXING: NO
         # MoltenVK (Apache-2.0, ThirdParty/moltenvk) for the N64 RDP renderer: device builds only (no simulator slice).
         "OTHER_LDFLAGS[sdk=iphoneos*]": ["$(inherited)", "$(SRCROOT)/ThirdParty/moltenvk/ios-arm64/libMoltenVK.a",
                                          "-framework", "Metal", "-framework", "IOSurface", "-framework", "QuartzCore"]
-      configs:
-        Debug:
-          # N64_ENABLED: Nintendo 64 import/play (Debug only until it has a renderer for real games).
-          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG N64_ENABLED
   DuoEmulatorTests:
     type: bundle.unit-test
     platform: iOS

@@ -246,7 +246,7 @@ struct PlayerView: View {
                     ControllerLayout.overlay(c.size, gameRect: gameInArea, system: system, sixButton: six, preset: $0)
                 }
             }
-            toastView.place(CGRect(x: game.minX, y: game.minY + 10, width: game.width, height: 40))
+            toastView.place(CGRect(x: game.minX, y: game.minY + 10, width: game.width, height: max(40, game.height - 20)))
             if physical && !model.menuOpen {
                 // With the game edge to edge, a small menu key stays reachable by touch.
                 Button { model.menuOpen = true } label: {
@@ -317,12 +317,45 @@ struct PlayerView: View {
         }
     }
 
-    @ViewBuilder var toastView: some View {
+    /// The toast, and below it any lasting notice about the machine (with an OK to dismiss it).
+    var toastView: some View {
+        VStack(spacing: 8) {
+            toastCapsule
+            noticeCard
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    @ViewBuilder var noticeCard: some View {
+        if let notice = model.notice {
+            VStack(alignment: .leading, spacing: 8) {
+                Label(notice, systemImage: "exclamationmark.triangle.fill")
+                    .font(.rounded(.footnote, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("OK") { model.notice = nil }
+                    .font(.rounded(.footnote, weight: .heavy))
+                    .foregroundStyle(Theme.ember)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .accessibilityLabel("Dismiss the message")
+                    .accessibilityIdentifier("notice.ok")
+            }
+            .padding(12)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .environment(\.colorScheme, .dark)
+            .padding(.horizontal, 12)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("player.notice")
+        }
+    }
+
+    @ViewBuilder var toastCapsule: some View {
         if let toast = model.toast {
             HStack(spacing: 10) {
                 Text(toast)
                     .font(.rounded(.footnote, weight: .semibold))
                     .foregroundStyle(Theme.ink)
+                    .multilineTextAlignment(.center)
                 if model.toastOffersUndo {
                     Button("Undo") { model.undoQuickLoad() }
                         .font(.rounded(.footnote, weight: .heavy))
@@ -336,7 +369,7 @@ struct PlayerView: View {
                 .background(.ultraThinMaterial, in: Capsule())
                 .environment(\.colorScheme, .dark)
                 .transition(.move(edge: .top).combined(with: .opacity))
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .frame(maxWidth: .infinity)
                 .padding(.top, 8)
         }
     }

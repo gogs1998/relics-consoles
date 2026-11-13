@@ -49,7 +49,7 @@ struct AboutView: View {
         NavigationStack {
             List {
                 Section {
-                    Text("Relics: Games plays games you own. It includes a few free homebrew demos, shared by their authors under free licences, and no Nintendo or Sega system software. It never downloads games.")
+                    Text("Relics: Games plays NES, SNES, Game Boy, Game Boy Color, Game Boy Advance, Mega Drive, Nintendo DS and Nintendo 64 games you own. It includes a few free homebrew demos, shared by their authors under free licences, and no Nintendo or Sega system software. It never downloads games.")
                     Text("Relics: Games is not affiliated with, endorsed or sponsored by Nintendo or Sega. Console names are trademarks of their owners and are used only to say which game files the app can open.")
                         .foregroundStyle(.secondary)
                 }
@@ -70,7 +70,8 @@ struct AboutView: View {
                     Text("No accounts, no ads, no analytics. Nothing leaves your device.")
                 }
                 Section {
-                    // Long-press opens the hidden N64 speed test (N64SpeedTestView).
+                    // Long-press opens the hidden N64 speed test (N64SpeedTestView). TestFlight only: release prep
+                    // must remove this gesture and N64SpeedTestView (HANDOFF.md).
                     Text(versionLine)
                         .font(.rounded(.footnote))
                         .foregroundStyle(.secondary)

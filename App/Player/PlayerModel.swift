@@ -39,6 +39,8 @@ final class PlayerModel {
     private(set) var fastForward = false
     private(set) var rewinding = false
     private(set) var toast: String?
+    /// A lasting message about the machine (the N64 GPU renderer failed to start), shown over the game until dismissed.
+    var notice: String?
     private(set) var savingPulse = 0
     private(set) var slotThumbs: [Int: UIImage] = [:]
     private(set) var slotDates: [Int: Date] = [:]
@@ -115,7 +117,7 @@ final class PlayerModel {
         }
         session.onStarted = { [weak self] w, h, crc, version, players in
             Task { @MainActor in
-                self?.videoSize = CGSize(width: w, height: h)
+                self?.videoSize = Self.displaySize(w, h)
                 self?.romCRC = crc
                 self?.stateVersion = version
                 self?.players = players
@@ -123,14 +125,18 @@ final class PlayerModel {
                 self?.started = true
                 // The lid closed or the app left while the core was starting: stay asleep.
                 if self?.sleepReasons.isEmpty == false { self?.pause() }
-                if autoResume && self?.settings.autoSave == true { self?.resumeAutoState() }
+                if autoResume && self?.settings.autoSave == true {
+                    // Loading a state renders a frame (GPU work for N64): never while the app is in the background.
+                    if self?.sleepReasons.contains(.background) == true { self?.pendingAutoResume = true }
+                    else { self?.resumeAutoState() }
+                }
             }
         }
         session.onVideoSize = { [weak self] w, h in
-            Task { @MainActor in
-                // SNES hi-res frames are twice as wide but show the same picture shape.
-                self?.videoSize = CGSize(width: w >= 512 ? w / 2 : w, height: h >= 448 ? h / 2 : h)
-            }
+            Task { @MainActor in self?.videoSize = Self.displaySize(w, h) }
+        }
+        session.onNotice = { [weak self] message in
+            Task { @MainActor in self?.notice = message }
         }
         session.start()
         audio.start(ring: session.audio)
@@ -206,6 +212,8 @@ final class PlayerModel {
     /// sleep; it wakes only when every reason has gone.
     enum SleepReason: Hashable { case lidClosed, background }
     private(set) var sleepReasons: Set<SleepReason> = []
+    /// The auto-save load waiting for the app to come back to the foreground (it left while the core was starting).
+    @ObservationIgnored private var pendingAutoResume = false
     var isAsleepWithLidClosed: Bool { sleepReasons.contains(.lidClosed) }
 
     /// Pauses emulation and audio, then writes the auto-save and the battery save (the first
@@ -229,6 +237,10 @@ final class PlayerModel {
     /// the layout editor and the controllers sheet are all closed).
     func wake(_ reason: SleepReason) {
         guard sleepReasons.remove(reason) != nil else { return }
+        if pendingAutoResume && !sleepReasons.contains(.background) {
+            pendingAutoResume = false
+            resumeAutoState()
+        }
         guard sleepReasons.isEmpty else { return }
         Self.log.info("wake (\(String(describing: reason)))")
         if !menuOpen && editor == nil && !showingControllers && !showingSettings { resume() }
@@ -247,7 +259,17 @@ final class PlayerModel {
         session.send(.speed(on ? settings.fastForwardSpeed : 1))
     }
 
+    /// The picture's shape in "native" pixels: SNES hi-res and the N64's 640 x 480 VI output are twice as wide (and
+    /// tall) as the picture they show, so layout and integer scaling work from half.
+    nonisolated static func displaySize(_ w: Int, _ h: Int) -> CGSize {
+        CGSize(width: w >= 512 ? w / 2 : w, height: h >= 448 ? h / 2 : h)
+    }
+
     func setRewind(_ on: Bool) {
+        if on && game.system == .n64 {
+            show("Rewind isn't available for Nintendo 64 games. Use save states instead.")
+            return
+        }
         rewinding = on
         session.send(.rewind(on))
     }

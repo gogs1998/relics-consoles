@@ -4,8 +4,8 @@ import UIKit
 
 /// Hidden N64 speed test (About › long-press the version line). Runs our own bench ROM through the N64 renderer
 /// (paraLLEl-RDP on MoltenVK + cxd4), synchronous then asynchronous, and shows fps with a CPU / RSP / RDP / GPU
-/// breakdown and the thermal state, with a Share button for the report. Nothing else of N64 is reachable in
-/// Release builds (N64_ENABLED is Debug-only). See docs/n64-rdp-spike.md.
+/// breakdown and the thermal state, with a Share button for the report. TestFlight only: release prep must remove
+/// this screen and the About gesture (HANDOFF.md). See docs/n64-rdp-spike.md.
 struct N64SpeedTestView: View {
     @StateObject private var model = N64SpeedTestModel()
 

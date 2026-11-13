@@ -66,8 +66,7 @@ struct LibraryView: View {
     }
 
     static var importTypes: [UTType] {
-        var exts = ["nes", "gb", "gbc", "gba", "sfc", "smc", "md", "gen", "smd", "nds"]
-        if SystemID.n64.isAvailableInThisBuild { exts += ["z64", "n64", "v64"] }
+        let exts = ["nes", "gb", "gbc", "gba", "sfc", "smc", "md", "gen", "smd", "nds", "z64", "n64", "v64"]
         let ids = exts.map { "com.iqlabs.duoemulator.\($0)" }
         return ids.compactMap { UTType($0) } + [.zip, .data]
     }
@@ -425,7 +424,7 @@ struct EmptyShelf: View {
             Text("Your shelf is empty")
                 .font(.rounded(.title3, weight: .heavy))
                 .foregroundStyle(Theme.ink)
-            Text("Add game files you own from the Files app. Nothing is included or downloaded.")
+            Text("Add game files you own from the Files app: NES, SNES, Game Boy, Game Boy Color, Game Boy Advance, Mega Drive, Nintendo DS and Nintendo 64. Nothing is included or downloaded.")
                 .font(.rounded(.subheadline))
                 .foregroundStyle(Theme.inkDim)
                 .multilineTextAlignment(.center)

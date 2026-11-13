@@ -1,5 +1,37 @@
 # HANDOFF: Duo Emulator ("Foldback")
 
+## Update, 13 Nov 2026 (build 5: N64 unhidden, paraLLEl-RDP in normal play)
+Gordon's decision: N64 ships in the first App Store release **if his own games work** through TestFlight. Build 5 is
+for that test (internal TestFlight only, never App Review).
+- **N64 in Release:** `N64_ENABLED`, the Release Info.plist UTType stripping and the "isn't available in this version
+  yet" import path are gone. N64 is in the import error's system list, the empty shelf and About.
+- **Renderer in play** (device only): paraLLEl-RDP on MoltenVK + cxd4, **asynchronous** RDP
+  (`N64System(synchronousRDP: false)` in `EmulatorSession.makeCore`; flip to true if a game's framebuffer effects
+  look wrong). 640 x 480 VI output → Metal (layout treats it as 320 x 240, 4:3). The frame boundary now waits for the
+  RDP timeline, so save states never see in-flight GPU writes and no GPU work is submitted while asleep.
+- **Pipeline cache:** `Application Support/N64 Renderer/vulkan-pipelines.bin` (backup-excluded), our header
+  (`glue/include/N64PipelineCache.h`) + Vulkan header checked before use, any mismatch deletes it; a `.loading`
+  sentinel discards a cache that crashed/hung the driver last time. Saved on pause (`EmulatorCore.prepareForSuspend`)
+  and game close. No explicit pre-warm (paraLLEl compiles specialised pipelines async with an ubershader fallback).
+- **Robustness:** `n64_renderer` / `N64System.renderer` (rdp / viUnavailable / viFailed); a device failure shows a
+  notice over the game (`PlayerModel.notice`) instead of a black screen. Without the renderer the RDP stream is still
+  consumed and SyncFull still raises the DP interrupt (games don't hang).
+- **Rewind off for N64** (`EmulatorCore.supportsRewind`; 8 MB-RDRAM gzip states): the rewind keys show a toast.
+  The auto-save load is deferred to wake if the app went to the background while a game was starting.
+- **Tests:** CoreKit 104 pass (new: VI fallback status, pipeline-cache round trip + every-byte corruption/mismatch).
+  Release device check zero warnings, ROM allowlist passes. **Simulator only:** Shared iPhone 17e, `-autoplay
+  n64_demo.z64` shows our test cart through the VI fallback, no notice (expected there). **All real N64 rendering,
+  the pipeline cache, sound and the stick feel are device-only and untested by us.**
+- **Fable review:** 1 must-fix (state save/load not at an RDP-idle point in async mode: fixed by waiting for the
+  timeline at every frame boundary) + shoulds applied (auto-resume while backgrounded, poison-cache sentinel, cache
+  load try/catch + 16 MB cap, `g_h` cleared last in `n64_destroy`, fd leak, RDP partial command dropped on reset).
+  Not done: the speed test still runs outside `coreGate` (hidden, TestFlight-only; goes with it).
+- **Release prep MUST remove** the hidden N64 speed test (About › long-press the version line, `N64SpeedTestView`,
+  `N64SpeedTest`, the bench ROM and its allowlist entry in `project.yml`). CLAUDE.md's N64 lines (VI-only video,
+  "N64 hidden") are now stale and want updating.
+
+---
+
 ## Update, 13 Nov 2026 (v1 feature batch: sleep, pose editor, table tray, RTC, mappers, zip, settings)
 Goal: v1 App Store-ready at £3.99 (NES, GB/GBC, GBA, SNES, MD, DS; N64 hidden until v2). Commits b21c34f..b8f3d87.
 - **Close-to-sleep (all systems):** `PlayerModel.sleep/wake(_:)` with reasons `.lidClosed` (DuoKit `stage.isClosed`,
