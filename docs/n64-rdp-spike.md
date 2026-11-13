@@ -214,3 +214,16 @@ python3 Tools/build_n64_bench_rom.py      # then update its SHA-256 in project.y
 Spikes/N64RDP/build_mac.sh                # needs only ThirdParty-src/moltenvk/macos/libMoltenVK.dylib now
 N64RDP_ROOT=$PWD build/n64rdp-spike/mac/n64rdp_bench Packages/CoreKit/Sources/N64Core/Resources/n64_rdpbench.z64 [--async] [--ppm frame.ppm]
 ```
+
+## 9. Device result (Gordon, 13 Nov 2026, build 4 via TestFlight)
+iPhone 18 Pro Max (iPhone19,7, A20 Pro), iOS 27.2.1, thermal nominal throughout. MoltenVK + paraLLEl-RDP ran first time on device.
+
+| Load | Sync fps | Async fps |
+|---|---|---|
+| Light (800 tris) | 298 | 342 |
+| Busy (2,000) | 214 | 242 |
+| Stress (4,000) | 142 | 164 |
+
+Faster than the M4 Mac. Worst frame was 24.8 ms on first use (shader build), otherwise under 8 ms.
+**Decision: N64 goes in v2** (threshold was 75 fps busy). Still unknown: older iPhones (A15/A16), real
+games' heavier microcode and CountPerOp, shader-compile stutter (consider a pipeline cache).
