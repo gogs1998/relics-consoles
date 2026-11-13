@@ -27,6 +27,10 @@ struct AboutView: View {
                 file: "Licence-mupen64plus-GPL-2.0-or-later"),
         Licence(id: "mupen64plus-bundled", title: "MiniZip, MD5, xxHash, CIC-NUS-6105", detail: "Parts of mupen64plus · zlib, BSD 2-Clause",
                 file: "Licence-mupen64plus-bundled"),
+        Licence(id: "gpl3", title: "GNU GPL 3.0", detail: "The licence of the app as a whole, of melonDS and of the GPL demos",
+                file: "Licence-GPL-3.0"),
+        Licence(id: "ccbysa", title: "CC BY-SA 4.0", detail: "The licence of µCity's and Alex vs Bus's graphics and music",
+                file: "Licence-CC-BY-SA-4.0"),
         Licence(id: "melonds-bundled", title: "xxHash, FatFs, tiny-AES-c, blip_buf", detail: "Parts of melonDS · BSD 2-Clause, FatFs, Unlicense, LGPL-2.1",
                 file: "Licence-melonDS-bundled"),
     ]
@@ -35,30 +39,22 @@ struct AboutView: View {
         NavigationStack {
             List {
                 Section {
-                    Text("Relics: Games plays games you own. It includes no games and no console system software, and never downloads any.")
+                    Text("Relics: Games plays games you own. It includes a few free homebrew demos, shared by their authors under free licences, and no Nintendo or Sega system software. It never downloads games.")
                     Text("Relics: Games is not affiliated with, endorsed or sponsored by Nintendo or Sega. Console names are trademarks of their owners and are used only to say which game files the app can open.")
                         .foregroundStyle(.secondary)
                 }
                 Section("Our own work") {
                     Text("The NES and Game Boy / Game Boy Color cores, the app, its controller and art are original IQ Labs work.")
+                    Text("Relics: Games © 2026 IQ Labs. It is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License, version 3 or (at your option) any later version. It comes with NO WARRANTY. See GNU GPL 3.0 below.")
+                        .foregroundStyle(.secondary)
+                }
+                Section("Free demos") {
+                    licenceLink(Licence(id: "demos", title: "Demos on your shelf",
+                                        detail: "µCity by Antonio Niño Díaz · Libbet and the Magic Floor, Thwaite and Concentration Room by Damian Yerrick · Alex vs Bus: The Race by M374LX · GPL-3.0-or-later, CC BY-SA 4.0, zlib · credits, licences and where to get the source",
+                                        file: "Licence-demos-credits"))
                 }
                 Section("Acknowledgements") {
-                    ForEach(licences) { l in
-                        NavigationLink {
-                            ScrollView {
-                                Text(text(for: l.file))
-                                    .font(.system(.caption, design: .monospaced))
-                                    .textSelection(.enabled)
-                                    .padding()
-                            }
-                            .navigationTitle(l.title)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(l.title).font(.rounded(.body, weight: .semibold))
-                                Text(l.detail).font(.rounded(.caption)).foregroundStyle(.secondary)
-                            }
-                        }
-                    }
+                    ForEach(licences) { l in licenceLink(l) }
                 }
                 Section("Privacy") {
                     Text("No accounts, no ads, no analytics. Nothing leaves your device.")
@@ -70,6 +66,23 @@ struct AboutView: View {
             }
         }
         .preferredColorScheme(.dark)
+    }
+
+    private func licenceLink(_ l: Licence) -> some View {
+        NavigationLink {
+            ScrollView {
+                Text(text(for: l.file))
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+                    .padding()
+            }
+            .navigationTitle(l.title)
+        } label: {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(l.title).font(.rounded(.body, weight: .semibold))
+                Text(l.detail).font(.rounded(.caption)).foregroundStyle(.secondary)
+            }
+        }
     }
 
     private func text(for file: String) -> String {

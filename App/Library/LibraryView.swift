@@ -64,7 +64,9 @@ struct LibraryView: View {
     }
 
     static var importTypes: [UTType] {
-        let ids = ["nes", "gb", "gbc", "gba", "sfc", "smc", "md", "gen", "smd", "nds", "z64", "n64", "v64"].map { "com.iqlabs.duoemulator.\($0)" }
+        var exts = ["nes", "gb", "gbc", "gba", "sfc", "smc", "md", "gen", "smd", "nds"]
+        if SystemID.n64.isAvailableInThisBuild { exts += ["z64", "n64", "v64"] }
+        let ids = exts.map { "com.iqlabs.duoemulator.\($0)" }
         return ids.compactMap { UTType($0) } + [.data]
     }
 
@@ -236,7 +238,7 @@ struct GameCard: View {
                     .foregroundStyle(Color.black.opacity(0.82))
                     .lineLimit(2, reservesSpace: true)
                     .multilineTextAlignment(.leading)
-                Text(game.system.displayName)
+                Text(game.isDemo ? "\(game.system.displayName) · Free demo" : game.system.displayName)
                     .font(.rounded(.caption2, weight: .bold))
                     .foregroundStyle(Color.black.opacity(0.5))
             }

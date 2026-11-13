@@ -24,6 +24,11 @@ targets:
     platform: iOS
     sources:
       - path: App
+        excludes: ["Resources/Demos/**", "Resources/Demos"]
+      # Free homebrew demos (credits in Licenses/demos-credits.txt), copied as a folder: Demos/<file>.
+      - path: App/Resources/Demos
+        type: folder
+        buildPhase: resources
     dependencies:
       - package: DuoKit
       - package: CoreKit
@@ -37,6 +42,8 @@ targets:
     postBuildScripts:
       - name: Test ROMs (Debug only) and Release ROM check
         basedOnDependencyAnalysis: false
+        inputFiles:
+          - $(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)
         script: |
           APP="${TARGET_BUILD_DIR}/${WRAPPER_NAME}"
           if [ "${CONFIGURATION}" = "Debug" ]; then
@@ -44,8 +51,39 @@ targets:
             cp "${SRCROOT}"/TestROMs/build/*.nes "${SRCROOT}"/TestROMs/build/*.gb "${SRCROOT}"/TestROMs/build/*.gbc "${SRCROOT}"/TestROMs/build/*.gba "${SRCROOT}"/TestROMs/build/*.sfc "${SRCROOT}"/TestROMs/build/*.md "${SRCROOT}"/TestROMs/build/*.nds "${SRCROOT}"/TestROMs/build/*.z64 "${APP}/TestCarts/" 2>/dev/null || true
           else
             rm -rf "${APP}/TestCarts"
-            FOUND=$(find "${APP}" \( -iname '*.nes' -o -iname '*.gb' -o -iname '*.gbc' -o -iname '*.gba' -o -iname '*.sfc' -o -iname '*.smc' -o -iname '*.md' -o -iname '*.gen' -o -iname '*.smd' -o -iname '*.nds' -o -iname '*.z64' -o -iname '*.n64' -o -iname '*.v64' -o -iname '*.zip' -o -iname '*.bin' -o -iname '*.rom' -o -iname '*.bios' \) -not -path '*/Licences/*' | head -1)
-            if [ -n "${FOUND}" ]; then echo "error: ROM file inside a Release bundle: ${FOUND}"; exit 1; fi
+            # Nintendo 64 is Debug-only (N64_ENABLED): the Release Info.plist must not advertise its file types.
+            /usr/bin/python3 -I - "${APP}/Info.plist" <<'PY' || exit 1
+          import plistlib, sys
+          path = sys.argv[1]
+          with open(path, "rb") as f:
+              raw = f.read()
+          fmt = plistlib.FMT_BINARY if raw.startswith(b"bplist") else plistlib.FMT_XML
+          p = plistlib.loads(raw)
+          n64 = {"com.iqlabs.duoemulator.z64", "com.iqlabs.duoemulator.n64", "com.iqlabs.duoemulator.v64"}
+          for d in p.get("CFBundleDocumentTypes", []):
+              d["LSItemContentTypes"] = [t for t in d.get("LSItemContentTypes", []) if t not in n64]
+          p["UTImportedTypeDeclarations"] = [t for t in p.get("UTImportedTypeDeclarations", []) if t.get("UTTypeIdentifier") not in n64]
+          with open(path, "wb") as f:
+              plistlib.dump(p, f, fmt=fmt)
+          left = [k for k in ("z64", "n64", "v64") if ("com.iqlabs.duoemulator." + k).encode() in plistlib.dumps(p)]
+          if left:
+              sys.exit("error: N64 document types still in the Release Info.plist: %s" % left)
+          PY
+            # ROM check: the only game files allowed are the bundled homebrew demos, by path and SHA-256.
+            ALLOW=" Demos/ucity.gbc:9422ee2ca7b7ea1d46b58b2a429fff3f354dfd3e732dee1e7ae6220f148ce6e0 Demos/libbet.gb:3607412031c8287cf878299ce96e581e85b852dde703806343b95576fa3ff1a9 Demos/thwaite.nes:3543ebf804f80abb19acfde4630a909a7485e2d69487900fd93b5698c412adc5 Demos/croom.nes:6a43202f8b7793f78832c47b67ca3aeb12165140a1e38f0a5043855b2e3d53cd Demos/alexvsbus-pre3.md:1b05f681125445cfedf4cdc0819a79c9d372d5dc198cc36afbd61d6876161be1 "
+            LIST="${DERIVED_FILE_DIR}/rom-check.txt"
+            mkdir -p "${DERIVED_FILE_DIR}"
+            find "${APP}" \( -iname '*.nes' -o -iname '*.gb' -o -iname '*.gbc' -o -iname '*.gba' -o -iname '*.sfc' -o -iname '*.smc' -o -iname '*.md' -o -iname '*.gen' -o -iname '*.smd' -o -iname '*.nds' -o -iname '*.z64' -o -iname '*.n64' -o -iname '*.v64' -o -iname '*.zip' -o -iname '*.bin' -o -iname '*.rom' -o -iname '*.bios' \) -type f > "${LIST}"
+            COUNT=0
+            while IFS= read -r F; do
+              REL="${F#${APP}/}"
+              SUM=$(shasum -a 256 "${F}" | cut -d' ' -f1)
+              case "${ALLOW}" in
+                *" ${REL}:${SUM} "*) COUNT=$((COUNT + 1)) ;;
+                *) echo "error: ROM file inside a Release bundle that is not an allowed demo: ${REL}"; exit 1 ;;
+              esac
+            done < "${LIST}"
+            if [ "${COUNT}" -ne 5 ]; then echo "error: expected the 5 bundled demos in Demos/, found ${COUNT}"; exit 1; fi
           fi
     settings:
       base:
@@ -56,11 +94,12 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1,2"
         MARKETING_VERSION: "0.1"
-        CURRENT_PROJECT_VERSION: "2"
+        CURRENT_PROJECT_VERSION: "3"
         ENABLE_USER_SCRIPT_SANDBOXING: NO
       configs:
         Debug:
-          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+          # N64_ENABLED: Nintendo 64 import/play (Debug only until it has a renderer for real games).
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG N64_ENABLED
   DuoEmulatorTests:
     type: bundle.unit-test
     platform: iOS

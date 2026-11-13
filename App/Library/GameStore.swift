@@ -15,16 +15,35 @@ struct GameRecord: Codable, Identifiable, Hashable, Sendable {
     var playSeconds: Double = 0
     /// DEBUG test carts live in the app bundle and are never copied into Documents.
     var isBundledTestCart = false
+    /// A free homebrew demo seeded from the app bundle on first launch (optional, so older
+    /// library files without the key still decode).
+    var demo: Bool?
+
+    var isDemo: Bool { demo == true }
+}
+
+extension SystemID {
+    /// Systems this build lets you import and play. Nintendo 64 is Debug-only (`N64_ENABLED`)
+    /// until it has a renderer for real games.
+    var isAvailableInThisBuild: Bool {
+        #if N64_ENABLED
+        true
+        #else
+        self != .n64
+        #endif
+    }
 }
 
 enum ImportError: LocalizedError {
     case notAGame(String)
     case unreadable(String)
+    case notInThisVersion(String, SystemID)
 
     var errorDescription: String? {
         switch self {
-        case .notAGame(let name): "\(name) isn't a game file this app can play (NES, SNES, Game Boy, Game Boy Color, Game Boy Advance or Mega Drive)."
+        case .notAGame(let name): "\(name) isn't a game file this app can play (NES, SNES, Game Boy, Game Boy Color, Game Boy Advance, Mega Drive or Nintendo DS)."
         case .unreadable(let name): "\(name) couldn't be read."
+        case .notInThisVersion(let name, let system): "\(name) is a \(system.displayName) game. \(system.displayName) isn't available in this version yet."
         }
     }
 }
@@ -51,6 +70,7 @@ final class GameStore {
             try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         }
         load()
+        seedDemos()
         scanInbox()
         #if DEBUG
         addBundledTestCarts()
@@ -80,7 +100,10 @@ final class GameStore {
     private func load() {
         guard let data = try? Data(contentsOf: indexURL),
               let list = try? JSONDecoder().decode([GameRecord].self, from: data) else { return }
-        games = list.filter { $0.isBundledTestCart || FileManager.default.fileExists(atPath: romURL(for: $0).path) }
+        games = list.filter {
+            $0.system.isAvailableInThisBuild
+                && ($0.isBundledTestCart || FileManager.default.fileExists(atPath: romURL(for: $0).path))
+        }
     }
 
     private func save() {
@@ -171,23 +194,75 @@ final class GameStore {
               system == .ds || data.count <= (system == .n64 ? 64 : 32) * 1024 * 1024 else {
             throw ImportError.notAGame(name)
         }
-        let id = Insecure.SHA1.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        guard system.isAvailableInThisBuild else { throw ImportError.notInThisVersion(name, system) }
+        let id = Self.gameID(data)
         if games.contains(where: { $0.id == id }) { return false }
+        let fileName = try write(data, named: name, system: system)
+        games.append(GameRecord(id: id, title: Self.title(fromFileName: name), system: system,
+                                fileName: fileName, added: Date()))
+        return true
+    }
+
+    private static func gameID(_ data: Data) -> String {
+        Insecure.SHA1.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Writes the file into Games/<system>/ under a free name; returns the name used.
+    private func write(_ data: Data, named name: String, system: SystemID) throws -> String {
         let folder = gamesDir.appendingPathComponent(folderName(system), isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let ext = (name as NSString).pathExtension
         var fileName = name
         var dest = folder.appendingPathComponent(fileName)
         var n = 2
         while FileManager.default.fileExists(atPath: dest.path) {
             let base = (name as NSString).deletingPathExtension
-            fileName = "\(base) (\(n)).\(url.pathExtension)"
+            fileName = "\(base) (\(n)).\(ext)"
             dest = folder.appendingPathComponent(fileName)
             n += 1
         }
         try data.write(to: dest, options: .atomic)
-        games.append(GameRecord(id: id, title: Self.title(fromFileName: name), system: system,
-                                fileName: fileName, added: Date()))
-        return true
+        return fileName
+    }
+
+    // MARK: demos
+
+    /// The free homebrew demos in the app bundle (App/Resources/Demos, credits in About).
+    /// The Release ROM check in project.yml allows exactly these files.
+    static let demoTitles: [String: String] = [
+        "ucity.gbc": "µCity",
+        "libbet.gb": "Libbet and the Magic Floor",
+        "thwaite.nes": "Thwaite",
+        "croom.nes": "Concentration Room",
+        "alexvsbus-pre3.md": "Alex vs Bus: The Race",
+    ]
+
+    private var seededDemosURL: URL { documents.appendingPathComponent(".seeded-demos.json") }
+
+    /// Copies each bundled demo onto the shelf once. A demo the player deletes is never seeded again
+    /// (its id stays in .seeded-demos.json).
+    private func seedDemos() {
+        guard let dir = Bundle.main.url(forResource: "Demos", withExtension: nil) else { return }
+        var seeded = Set((try? JSONDecoder().decode([String].self, from: Data(contentsOf: seededDemosURL))) ?? [])
+        let before = seeded.count
+        var added = false
+        for (fileName, title) in Self.demoTitles.sorted(by: { $0.key < $1.key }) {
+            let url = dir.appendingPathComponent(fileName)
+            guard let data = try? Data(contentsOf: url),
+                  let system = CoreFactory.detect(rom: data, fileExtension: url.pathExtension),
+                  system.isAvailableInThisBuild else { continue }
+            let id = Self.gameID(data)
+            guard !seeded.contains(id) else { continue }
+            seeded.insert(id)
+            if games.contains(where: { $0.id == id }) { continue }
+            guard let stored = try? write(data, named: fileName, system: system) else { continue }
+            games.append(GameRecord(id: id, title: title, system: system, fileName: stored, added: Date(), demo: true))
+            added = true
+        }
+        if added { save() }
+        if seeded.count != before, let out = try? JSONEncoder().encode(seeded.sorted()) {
+            try? out.write(to: seededDemosURL, options: .atomic)
+        }
     }
 
     /// "super_game_(v1.1).nes" → "Super Game"

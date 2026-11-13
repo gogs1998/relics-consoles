@@ -17,6 +17,21 @@ These third-party components are compiled into the app:
 | MiniZip, MD5, xxHash, CIC-NUS-6105 algorithm (inside mupen64plus-core) | zip states, ROM hashing, the 6105 cartridge challenge | zlib, zlib-style, BSD-2-Clause, BSD-2-Clause (`mupen64plus-bundled.txt`) | via mupen64plus-core | No |
 | xxHash, FatFs headers, tiny-AES-c headers, blip_buf (inside melonDS) | hashing, declarations, audio resampler | BSD-2-Clause, FatFs (1-clause), Unlicense, LGPL-2.1-or-later (`melonDS-bundled.txt`) | via melonDS | No |
 
+## Bundled homebrew demos (game files, not program code)
+
+Five freely licensed homebrew games ship as separate game files in `App/Resources/Demos/` and are copied onto the
+shelf on first launch (deletable, never re-seeded). Each is the author's unmodified build. Credits, notices and
+source locations: `demos-credits.txt`; full texts `GPL-3.0.txt` and `CC-BY-SA-4.0.txt`. The Release ROM check in
+`project.yml` allows exactly these five files (by name and SHA-256).
+
+| Demo | System | Author | Licence | Source |
+|---|---|---|---|---|
+| µCity 1.3 (`ucity.gbc`) | GBC | Antonio Niño Díaz | GPL-3.0-or-later code (GBT Player BSD-2-Clause), CC BY-SA 4.0 media | https://codeberg.org/SkyLyrac/ucity |
+| Libbet and the Magic Floor 0.08 (`libbet.gb`) | GB | Damian Yerrick | zlib | https://github.com/pinobatch/libbet |
+| Thwaite 0.03 (`thwaite.nes`) | NES | Damian Yerrick | GPL-3.0-or-later | https://github.com/pinobatch/thwaite-nes |
+| Concentration Room 0.02 (`croom.nes`) | NES | Damian Yerrick | GPL-3.0-or-later + exact-copy exception | https://github.com/pinobatch/croom-nes |
+| Alex vs Bus: The Race pre3 (`alexvsbus-pre3.md`) | Mega Drive | M374LX | GPL-3.0-or-later code, CC BY-SA 4.0 assets | https://github.com/M374LX/alexvsbus-md |
+
 The same texts ship inside the app (`App/Resources/Licences/`) and are shown on the
 Acknowledgements screen.
 

@@ -1,5 +1,39 @@
 # HANDOFF: Duo Emulator ("Foldback")
 
+## Update, 13 Nov 2026 (build 3 on TestFlight: N64 hidden, demo shelf)
+- **Build 3 uploaded to TestFlight** (internal only; Gordon approved; NOT submitted for review). Archive checked:
+  CFBundleVersion 3, no N64 document types in Info.plist, the five demos in `Demos/`.
+- **N64 hidden in Release:** Swift flag `N64_ENABLED` (Debug only, `project.yml`) via `SystemID.isAvailableInThisBuild`
+  (`GameStore.swift`): import refuses N64 with "…is a Nintendo 64 game. Nintendo 64 isn't available in this version
+  yet.", the picker omits .z64/.n64/.v64, old N64 shelf records are hidden. The Release post-build script strips the
+  N64 UTTypes from the built Info.plist (and fails if any remain). The mupen64plus code and `mupen64plus.ini` still
+  ship in the binary (unreachable), so its licence rows stay in About.
+- **Demo shelf:** `App/Resources/Demos/` (folder reference) = µCity 1.3 (`ucity.gbc`), Libbet 0.08 (`libbet.gb`),
+  Thwaite 0.03 (`thwaite.nes`), Concentration Room 0.02 (`croom.nes`), Alex vs Bus pre3 (`alexvsbus-pre3.md`), all
+  the authors' unmodified builds (GB logo / "SEGA" header bytes left as-is on Fable's ruling). `GameStore.seedDemos()`
+  copies each into Games/<system>/ once (record `demo: true`, card says "· Free demo"); ids kept in
+  `Documents/.seeded-demos.json` so a deleted demo never returns. Release ROM check now allows exactly these five
+  files by path + SHA-256 (and requires all five); any other ROM fails the build. Credits/licences:
+  `Licenses/demos-credits.txt`, `GPL-3.0.txt`, `CC-BY-SA-4.0.txt` (+ copies in `App/Resources/Licences/`), About has a
+  "Free demos" row, a GPLv3 notice for the app and new wording ("includes a few free homebrew demos… no Nintendo or
+  Sega system software"). Tobu Tobu Girl not included.
+- **Verified:** CoreKit `swift test` 92 pass; Release device build zero warnings. **Simulator only** (Shared iPhone
+  17e, reused because 2 sims were booted; app uninstalled after): the five demos appear (shelf 20 = 15 test carts + 5),
+  Thwaite launches to its title screen, a removed demo is not re-seeded. Not tested: the demos on a device, audio.
+- **Fable licence review: PASS WITH FIXES.** Nothing blocks internal TestFlight. Applied now: GPLv3 notice in About,
+  "no Nintendo or Sega system software", CC BY-SA URIs in the credits, removed an unbacked "3-year offer on request"
+  line. Rulings: melonDS/FreeBIOS fine; mupen64plus + CIC-6105 + ini low risk; ship logo/SEGA header bytes unmodified;
+  everything GPLv3-compatible. **Must do before any external/public build:**
+  1. Publish the app's source (incl. CoreKit, DuoKit under a GPL-compatible licence) and put the repo URL in About.
+  2. Mirror the exact source archives of µCity v1.3, Thwaite 0.03 and Alex vs Bus pre3 in our public repo/releases
+     (GPLv3 §6d) and cite that URL; add a contact email.
+  3. Check µCity's and Alex vs Bus's upstream readmes for third-party asset credits to carry over (CC BY-SA).
+  Should: ask Yerrick, Niño Díaz and M374LX for a written OK (App Store vs GPL/CC BY-SA DRM tension); consider
+  dropping N64Core + `mupen64plus.ini` from Release (guideline 2.3.1 dormant features; ~3,000 commercial titles in
+  the ini); list the demos in App Review notes; check the age rating.
+
+---
+
 ## Update, 13 Nov 2026 (Nintendo 64: mupen64plus + rsp-hle, no RDP renderer yet)
 - **Licence finding (blocker for the plan):** GLideN64 (`a04081a`) is **GPL-2.0-only**: its LICENSE says "licensed
   under the GNU General Public License version 2" with no "or later", and its core sources have no headers. That can't
