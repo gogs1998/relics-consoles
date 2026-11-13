@@ -86,6 +86,7 @@ struct RootView: View {
     ///   -holdStylus 128,96      hold the stylus on the DS touch screen at that pixel from launch
     ///   -openMenu YES           open the pause menu after 2 s
     ///   -freshStart YES         ignore the auto-save
+    ///   -editControls YES       open the touch-layout editor after 2 s
     private func debugAutoplay() {
         #if DEBUG
         let d = UserDefaults.standard
@@ -103,6 +104,12 @@ struct RootView: View {
             let xy = stylus.split(separator: ",").compactMap { Int($0) }
             if xy.count == 2 {
                 player.session.input.stylus.store(InputLatch.stylus(x: xy[0], y: xy[1]), ordering: .relaxed)
+            }
+        }
+        if d.bool(forKey: "editControls") {
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(2))
+                player?.beginEditingControls()
             }
         }
         if d.bool(forKey: "openMenu") {

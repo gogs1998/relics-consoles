@@ -30,6 +30,124 @@ enum ControllerArea: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// The poses a player can be in, each with its own layout (one or more areas).
+enum LayoutPose: String, CaseIterable, Identifiable {
+    case table, book, portrait, landscape
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .table: "Duo table"
+        case .book: "Duo book"
+        case .portrait: "Portrait"
+        case .landscape: "Landscape"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .table: "laptopcomputer"
+        case .book: "book"
+        case .portrait: "iphone"
+        case .landscape: "iphone.landscape"
+        }
+    }
+
+    func areas(_ system: SystemID) -> [ControllerArea] {
+        switch self {
+        case .table: system == .ds ? [.dsTableLeft, .dsTableRight, .dsTableBelow] : [.table]
+        case .book: [.bookLeft, .bookRight]
+        case .portrait: [.portrait]
+        case .landscape: [.landscape]
+        }
+    }
+
+    init(area: ControllerArea) {
+        switch area {
+        case .table, .dsTableLeft, .dsTableRight, .dsTableBelow: self = .table
+        case .bookLeft, .bookRight: self = .book
+        case .portrait: self = .portrait
+        case .landscape: self = .landscape
+        }
+    }
+
+    /// Where an area sits inside its pose, in a unit square: the common ground "copy from another
+    /// pose" maps through (book pages side by side; the DS table areas around the touch screen).
+    static func region(_ area: ControllerArea) -> CGRect {
+        switch area {
+        case .table, .portrait, .landscape: CGRect(x: 0, y: 0, width: 1, height: 1)
+        case .bookLeft: CGRect(x: 0, y: 0, width: 0.5, height: 1)
+        case .bookRight: CGRect(x: 0.5, y: 0, width: 0.5, height: 1)
+        case .dsTableLeft: CGRect(x: 0, y: 0, width: 0.25, height: 1)
+        case .dsTableRight: CGRect(x: 0.75, y: 0, width: 0.25, height: 1)
+        case .dsTableBelow: CGRect(x: 0.25, y: 0.75, width: 0.5, height: 0.25)
+        }
+    }
+}
+
+/// "Copy from another pose": the source pose's arrangement, mapped onto this pose's areas.
+enum LayoutCopier {
+    struct Source {
+        var area: ControllerArea
+        /// Unit-space controls, as saved.
+        var controls: [Control]
+        /// The area's size in points when it was saved (older files don't have it).
+        var areaSize: CGSize?
+    }
+
+    /// Each control the source has moves to the same relative place in this pose (into whichever
+    /// area holds that place) and takes the source's look (opacity, haptics, auto-fire, hidden).
+    /// Its size comes from the source when the source's size in points is known, else it keeps
+    /// its current size. Controls the source lacks stay where they are.
+    static func copy(from sources: [Source], into target: [ControllerArea: [Control]],
+                     sizes: [ControllerArea: CGSize]) -> [ControllerArea: [Control]] {
+        var placed: [String: (centre: CGPoint, size: CGSize?, control: Control)] = [:]
+        for s in sources {
+            let r = LayoutPose.region(s.area)
+            for c in s.controls {
+                let centre = CGPoint(x: r.minX + c.frame.midX * r.width, y: r.minY + c.frame.midY * r.height)
+                let size = s.areaSize.map { CGSize(width: c.frame.width * $0.width, height: c.frame.height * $0.height) }
+                placed[c.id] = (centre, size, c)
+            }
+        }
+        let areas = target.keys.filter { sizes[$0] != nil }.sorted { $0.rawValue < $1.rawValue }
+        var out: [ControllerArea: [Control]] = [:]
+        for a in areas { out[a] = [] }
+        for a in areas {
+            for var c in target[a] ?? [] {
+                guard let p = placed[c.id] else { out[a, default: []].append(c); continue }
+                // The area whose region holds the centre, else the nearest one.
+                let dest = areas.first { LayoutPose.region($0).contains(p.centre) } ?? areas.min { lhs, rhs in
+                    distance(p.centre, LayoutPose.region(lhs)) < distance(p.centre, LayoutPose.region(rhs))
+                } ?? a
+                guard let size = sizes[dest] else { out[a, default: []].append(c); continue }
+                let r = LayoutPose.region(dest)
+                let local = CGPoint(x: (p.centre.x - r.minX) / r.width * size.width,
+                                    y: (p.centre.y - r.minY) / r.height * size.height)
+                var s = p.size ?? c.frame.size
+                s.width = min(s.width, size.width)
+                s.height = min(s.height, size.height)
+                var f = CGRect(x: local.x - s.width / 2, y: local.y - s.height / 2, width: s.width, height: s.height)
+                f.origin.x = min(max(0, f.minX), size.width - f.width)
+                f.origin.y = min(max(0, f.minY), size.height - f.height)
+                c.frame = f
+                c.opacity = p.control.opacity
+                c.haptic = p.control.haptic
+                c.autoFire = p.control.autoFire
+                c.hidden = p.control.hidden
+                out[dest, default: []].append(c)
+            }
+        }
+        return out
+    }
+
+    private static func distance(_ p: CGPoint, _ r: CGRect) -> CGFloat {
+        let dx = max(r.minX - p.x, 0, p.x - r.maxX), dy = max(r.minY - p.y, 0, p.y - r.maxY)
+        return dx * dx + dy * dy
+    }
+}
+
 /// A saved layout: controls in unit space for one system, one area, and optionally one game.
 struct SavedLayout: Codable, Hashable {
     var version = 1
@@ -40,12 +158,18 @@ struct SavedLayout: Codable, Hashable {
     /// Unit-space controls; empty means "the preset's defaults".
     var controls: [Control]
     var settings: ControlSettings
+    /// The area's size in points when saved, so another pose can copy real control sizes.
+    var areaSize: CGSize?
 
     /// Clamps everything a file could get wrong: unit frames inside the area with a sensible
     /// minimum size, finite opacity / haptics, and settings in range.
     var sanitised: SavedLayout {
         var l = self
         l.settings = settings.sanitised
+        if let a = areaSize, !(a.width.isFinite && a.height.isFinite && a.width > 0 && a.height > 0
+                                && a.width < 5000 && a.height < 5000) {
+            l.areaSize = nil
+        }
         l.controls = controls.compactMap { c in
             var c = c
             let f = c.frame

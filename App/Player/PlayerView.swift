@@ -43,6 +43,14 @@ struct PlayerView: View {
         .frame(width: stage.bounds.width, height: stage.bounds.height)
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
+        .onChange(of: arrangement, initial: true) { _, new in
+            switch new {
+            case .table: model.pose = .table
+            case .book: model.pose = .book
+            case .portrait: model.pose = .portrait
+            case .landscape: model.pose = .landscape
+            }
+        }
         .onChange(of: arrangement) { _, _ in
             model.controller.releaseAll()
             model.session.input.stylus.store(0, ordering: .relaxed)

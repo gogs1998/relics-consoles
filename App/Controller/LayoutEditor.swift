@@ -24,6 +24,8 @@ final class LayoutEditor {
     @ObservationIgnored private var defaults: [ControllerArea: (LayoutPreset) -> [Control]] = [:]
     var selection: (area: ControllerArea, id: String)?
     var message: String?
+    /// The pose the player is in: the editor edits that pose's layout (set by the player view).
+    var pose: LayoutPose = .portrait
 
     private let store: LayoutStore
 
@@ -130,11 +132,48 @@ final class LayoutEditor {
         message = "Back to the standard layout. Done saves it; Cancel keeps the old one"
     }
 
+    /// Other poses that have a saved layout to copy (for the current scope: this game's, else
+    /// the system's).
+    func copySources() -> [LayoutPose] {
+        LayoutPose.allCases.filter { p in
+            p != pose && p.areas(system).contains { store.resolve(system, $0, game: gameID) != nil }
+        }
+    }
+
+    /// Copies another pose's saved arrangement onto this pose (Done saves it; Cancel discards it).
+    func copy(from source: LayoutPose) {
+        let saved = source.areas(system).compactMap { area in store.resolve(system, area, game: gameID).map { (area, $0) } }
+        guard let main = saved.first(where: { !$0.0.isSecondary }) ?? saved.first else {
+            message = "\(source.title) has no layout of its own yet"
+            return
+        }
+        if main.1.preset != preset { applyPreset(main.1.preset) }
+        let targets = pose.areas(system).filter { sizes[$0] != nil }
+        let sources = saved.map { LayoutCopier.Source(area: $0.0, controls: $0.1.controls, areaSize: $0.1.areaSize) }
+        let current = Dictionary(uniqueKeysWithValues: targets.map { ($0, controls[$0] ?? []) })
+        let copied = LayoutCopier.copy(from: sources, into: current, sizes: sizes)
+        for (area, list) in copied { controls[area] = list }
+        // Anything that landed on the game (landscape) is pushed off it, or keeps its old place.
+        for area in targets {
+            guard let keepOut = avoid[area], let size = sizes[area] else { continue }
+            controls[area] = (controls[area] ?? []).map { c in
+                guard c.frame.intersects(keepOut) else { return c }
+                var moved = c
+                moved.frame = pushedOut(c.frame, from: keepOut, in: size)
+                    ?? current[area]?.first { $0.id == c.id }?.frame ?? c.frame
+                return moved
+            }
+        }
+        settings = main.1.settings
+        selection = nil
+        message = "Copied from \(source.title). Done saves it; Cancel keeps the old one"
+    }
+
     func save() {
         for (area, list) in controls {
             guard let size = sizes[area] else { continue }
             store.save(SavedLayout(system: system, area: area, gameID: scopeGame ? gameID : nil, preset: preset,
-                                   controls: list.map { $0.toUnit(size) }, settings: settings))
+                                   controls: list.map { $0.toUnit(size) }, settings: settings, areaSize: size))
         }
         // Switching a game back to "all games" removes its own layout so the system's applies.
         if !scopeGame {
@@ -147,7 +186,7 @@ final class LayoutEditor {
         let layouts = controls.compactMap { area, list -> SavedLayout? in
             guard let size = sizes[area] else { return nil }
             return SavedLayout(system: system, area: area, gameID: nil, preset: preset,
-                               controls: list.map { $0.toUnit(size) }, settings: settings)
+                               controls: list.map { $0.toUnit(size) }, settings: settings, areaSize: size)
         }
         return LayoutDocument(bundle: LayoutBundle(system: system, layouts: layouts))
     }
@@ -287,9 +326,16 @@ struct LayoutEditorPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Text("Edit controls")
-                    .font(.rounded(.headline, weight: .heavy))
-                    .foregroundStyle(Theme.ink)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Edit controls")
+                        .font(.rounded(.headline, weight: .heavy))
+                        .foregroundStyle(Theme.ink)
+                    Label("\(editor.pose.title) layout", systemImage: editor.pose.symbol)
+                        .font(.rounded(.caption, weight: .semibold))
+                        .foregroundStyle(Theme.ember)
+                        .accessibilityLabel("Editing the \(editor.pose.title) layout")
+                        .accessibilityIdentifier("edit.pose")
+                }
                 Spacer(minLength: 4)
                 Button("Cancel", action: onCancel).buttonStyle(ChipStyle(selected: false))
                 Button {
@@ -313,6 +359,18 @@ struct LayoutEditorPanel: View {
                         Button("This game only") { editor.scopeGame = true }
                     } label: { Label(editor.scopeGame ? "This game" : "All games", systemImage: "scope") }
                     .buttonStyle(ChipStyle(selected: false))
+                    Menu {
+                        let sources = editor.copySources()
+                        if sources.isEmpty {
+                            Text("No other pose has its own layout yet")
+                        }
+                        ForEach(sources) { p in
+                            Button { editor.copy(from: p) } label: { Label(p.title, systemImage: p.symbol) }
+                        }
+                    } label: { Label("Copy from", systemImage: "doc.on.doc") }
+                    .buttonStyle(ChipStyle(selected: false))
+                    .accessibilityLabel("Copy the layout from another pose")
+                    .accessibilityIdentifier("edit.copyFrom")
                     Button { editor.snap.toggle() } label: { Label("Snap", systemImage: "grid") }
                         .buttonStyle(ChipStyle(selected: editor.snap))
                     Button { editor.reset() } label: { Label("Reset", systemImage: "arrow.counterclockwise") }

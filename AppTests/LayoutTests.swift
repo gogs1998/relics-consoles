@@ -94,3 +94,48 @@ import Testing
         #expect(ab.hitFrame == ab.frame)
     }
 }
+
+/// "Copy from another pose" in the layout editor.
+@MainActor
+@Suite struct LayoutCopyTests {
+    @Test func tableToBookSplitsAcrossThePages() {
+        let tableSize = CGSize(width: 400, height: 260)
+        let table = ControllerLayout.deck(tableSize, system: .nes)
+        let page = CGSize(width: 200, height: 120)
+        let left = ControllerLayout.bookLeft(page, system: .nes)
+        let right = ControllerLayout.bookRight(page, system: .nes)
+        let out = LayoutCopier.copy(from: [.init(area: .table, controls: table.map { $0.toUnit(tableSize) }, areaSize: tableSize)],
+                                    into: [.bookLeft: left, .bookRight: right],
+                                    sizes: [.bookLeft: page, .bookRight: page])
+        // The D-pad sits on the left of the table deck, the A button on the right.
+        #expect(out[.bookLeft]?.contains { $0.kind == .dpad } == true)
+        #expect(out[.bookRight]?.contains { $0.id == Control(kind: .face(.a, "A", .ember), frame: .zero).id } == true)
+        // Nothing lost, everything inside its page.
+        #expect((out[.bookLeft]?.count ?? 0) + (out[.bookRight]?.count ?? 0) == left.count + right.count)
+        for (_, list) in out {
+            for c in list { #expect(CGRect(origin: .zero, size: page).contains(c.frame)) }
+        }
+    }
+
+    @Test func keepsSizeWithoutSourceSizeAndCopiesLook() {
+        let size = CGSize(width: 300, height: 200)
+        var src = ControllerLayout.deck(size, system: .gb)
+        let i = src.firstIndex { $0.kind == .dpad }!
+        src[i].frame.origin = CGPoint(x: 150, y: 20)
+        src[i].opacity = 0.4
+        let target = ControllerLayout.deck(CGSize(width: 400, height: 300), system: .gb)
+        let out = LayoutCopier.copy(from: [.init(area: .portrait, controls: src.map { $0.toUnit(size) }, areaSize: nil)],
+                                    into: [.table: target], sizes: [.table: CGSize(width: 400, height: 300)])
+        let d = out[.table]!.first { $0.kind == .dpad }!
+        let old = target.first { $0.kind == .dpad }!
+        #expect(d.frame.size == old.frame.size)
+        #expect(d.opacity == 0.4)
+        #expect(abs(d.frame.midX / 400 - src[i].frame.midX / 300) < 0.01 || d.frame.maxX == 400)
+    }
+
+    @Test func poseOfEveryArea() {
+        for a in ControllerArea.allCases {
+            #expect(LayoutPose(area: a).areas(a.rawValue.hasPrefix("ds") ? .ds : .nes).contains(a))
+        }
+    }
+}

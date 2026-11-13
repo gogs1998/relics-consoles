@@ -327,9 +327,15 @@ final class PlayerModel {
         }
     }
 
+    /// The pose the player view is laid out for (the layout editor edits this pose's layout).
+    var pose: LayoutPose = .portrait {
+        didSet { editor?.pose = pose }
+    }
+
     func beginEditingControls() {
         controller.releaseAll()
         editor = LayoutEditor(system: game.system, gameID: game.id, store: layouts)
+        editor?.pose = pose
         menuOpen = false          // stays paused while editing
     }
 
