@@ -1,5 +1,6 @@
 import CoreKit
 import Foundation
+import MUPEN64
 @testable import N64Core
 import Testing
 
@@ -188,6 +189,99 @@ import Testing
         let fps = Double(frames) / Date().timeIntervalSince(start)
         print("N64 cached interpreter: \(Int(fps)) fps (\(String(format: "%.1f", fps / 60))x real time)")
         #expect(fps > 60)
+    }
+
+    /// No Vulkan on the Mac test host: the VI scan-out is the expected fallback (no notice for the player), the
+    /// command stream is still consumed, and rewind is off for N64.
+    @Test func rendererFallsBackToVIScanOutWithoutVulkan() throws {
+        let n = try demo()
+        for _ in 0..<5 { n.runFrame(input: []) }
+        #expect(n.renderer == .viUnavailable, "\(n.renderer) \(n.rendererInfo)")
+        #expect(n.statusNotice == nil)
+        #expect(n.supportsRewind == false)
+        #expect(n.videoSize == VideoSize(width: 320, height: 240))
+        n.prepareForSuspend()   // no renderer: a no-op, must not crash
+    }
+
+    // MARK: pipeline cache file (N64PipelineCache.h)
+
+    private func cacheID(vendor: UInt32 = 0x106B, device: UInt32 = 0x1234, uuidByte: UInt8 = 7) -> N64PipelineCacheID {
+        var id = N64PipelineCacheID()
+        id.vendorID = vendor
+        id.deviceID = device
+        id.driverVersion = 0x0001_0402
+        withUnsafeMutableBytes(of: &id.uuid) { p in for i in 0..<16 { p[i] = uuidByte &+ UInt8(i) } }
+        return id
+    }
+
+    /// Granite's blob for `id`: UUID, an 8-byte hash, then a Vulkan cache with a VkPipelineCacheHeaderVersionOne.
+    private func payload(_ id: N64PipelineCacheID, body: Int = 100) -> [UInt8] {
+        var uuid = [UInt8](repeating: 0, count: 16)
+        withUnsafeBytes(of: id.uuid) { p in for i in 0..<16 { uuid[i] = p[i] } }
+        func le(_ v: UInt32) -> [UInt8] { withUnsafeBytes(of: v.littleEndian) { Array($0) } }
+        var p = uuid + [UInt8](repeating: 0xAB, count: 8)
+        p += le(32) + le(1) + le(id.vendorID) + le(id.deviceID) + uuid
+        p += (0..<body).map { UInt8(truncatingIfNeeded: $0 * 31) }
+        return p
+    }
+
+    private func file(_ id: N64PipelineCacheID, _ payload: [UInt8]) -> [UInt8] {
+        var header = [UInt8](repeating: 0, count: Int(N64_PIPELINE_CACHE_HEADER_SIZE))
+        var id = id
+        header.withUnsafeMutableBufferPointer { h in
+            payload.withUnsafeBufferPointer { p in n64pc_make_header(h.baseAddress, &id, p.baseAddress, p.count) }
+        }
+        return header + payload
+    }
+
+    private func validate(_ f: [UInt8], _ id: N64PipelineCacheID) -> (ok: Bool, offset: Int, size: Int) {
+        var id = id
+        var off = 0, size = 0
+        let ok = f.withUnsafeBufferPointer { n64pc_validate($0.baseAddress, $0.count, &id, &off, &size) }
+        return (ok, off, size)
+    }
+
+    @Test func pipelineCacheFileRoundTrip() {
+        let id = cacheID()
+        let p = payload(id)
+        let f = file(id, p)
+        let r = validate(f, id)
+        #expect(r.ok)
+        #expect(r.offset == Int(N64_PIPELINE_CACHE_HEADER_SIZE) && r.size == p.count)
+        #expect(Array(f[r.offset..<(r.offset + r.size)]) == p)
+    }
+
+    @Test func pipelineCacheFileRejectsCorruptOrForeignData() {
+        let id = cacheID()
+        let good = file(id, payload(id))
+        // every single-byte flip anywhere in the file is caught (header fields, checksum, payload)
+        for i in stride(from: 0, to: good.count, by: 3) {
+            var bad = good
+            bad[i] ^= 0x5A
+            #expect(!validate(bad, id).ok, "flip at \(i)")
+        }
+        // truncated, extended, empty, nothing
+        #expect(!validate(Array(good.dropLast()), id).ok)
+        #expect(!validate(good + [0], id).ok)
+        #expect(!validate(Array(good.prefix(Int(N64_PIPELINE_CACHE_HEADER_SIZE))), id).ok)
+        #expect(!validate([], id).ok)
+        var idCopy = id
+        #expect(!n64pc_validate(nil, 0, &idCopy, nil, nil))
+        // another GPU, driver or MoltenVK build (UUID)
+        #expect(!validate(good, cacheID(device: 0x9999)).ok)
+        #expect(!validate(good, cacheID(vendor: 0x10DE)).ok)
+        #expect(!validate(good, cacheID(uuidByte: 8)).ok)
+        var otherDriver = id
+        otherDriver.driverVersion += 1
+        #expect(!validate(good, otherDriver).ok)
+        // a well-formed file whose Vulkan header names another device / version / impossible length
+        for patch in [(24 + 8, UInt8(0x99)), (24 + 4, UInt8(2)), (24 + 0, UInt8(0xFF)), (24 + 0, UInt8(8))] {
+            var p = payload(id)
+            p[patch.0] = patch.1
+            #expect(!validate(file(id, p), id).ok, "vk header patch at \(patch.0)")
+        }
+        // too short to hold Granite's prefix and a Vulkan header
+        #expect(!validate(file(id, Array(payload(id).prefix(40))), id).ok)
     }
 
     private func dump(_ n: N64System, _ name: String) {

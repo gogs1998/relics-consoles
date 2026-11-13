@@ -25,8 +25,26 @@ typedef struct N64Handle N64Handle;
 enum {
     N64_SCREEN_WIDTH = 320,
     N64_SCREEN_HEIGHT = 240,
+    /// The RDP's VI output at full resolution (n64_configure).
+    N64_MAX_VIDEO_WIDTH = 640,
+    N64_MAX_VIDEO_HEIGHT = 480,
     N64_MAX_PLAYERS = 4,
 };
+
+/// How the picture is made (`n64_renderer`).
+enum {
+    /// paraLLEl-RDP on MoltenVK renders the RDP and runs the VI on the GPU: real games' graphics show.
+    N64_RENDERER_RDP = 0,
+    /// No Vulkan in this build (simulator, Mac tests): our VI scan-out of RDRAM, as designed.
+    N64_RENDERER_VI_UNAVAILABLE = 1,
+    /// Vulkan should have worked here (a device) but didn't start: VI scan-out, and the player must be told.
+    N64_RENDERER_VI_FAILED = 2,
+};
+
+/// Process-wide options, applied by the next `n64_create` (a running machine keeps its own): the persistent Vulkan pipeline cache file (NULL = none; see
+/// N64PipelineCache.h), synchronous RDP (the CPU waits for the GPU at every SyncFull) or asynchronous (only the VI
+/// scan-out waits), and whether the RDP's 640 x 480 VI output is handed on unscaled (else it is scaled to 320 x 240).
+void n64_configure(const char* pipelineCachePath, bool synchronousRdp, bool fullResolution);
 
 /// Controller buttons (the N64 controller status word's order). Set = pressed.
 enum {
@@ -64,9 +82,17 @@ void n64_set_input(N64Handle* h, int port, uint32_t buttons, int8_t x, int8_t y)
 /// Runs until the next vertical interrupt (one video field: 1/60 s NTSC, 1/50 s PAL).
 void n64_run_frame(N64Handle* h);
 
-/// 320 x 240 pixels, little-endian 0xAARRGGBB words: the VI's framebuffer as the video interface
-/// scans it out of RDRAM, scaled to 320 x 240.
+/// `n64_video_width` x `n64_video_height` pixels, little-endian 0xAARRGGBB words: the picture the VI shows,
+/// always 4:3 (640 x 480 from the RDP at full resolution, else 320 x 240). Valid until the next run/load.
 const uint32_t* n64_framebuffer(const N64Handle* h);
+int n64_video_width(const N64Handle* h);
+int n64_video_height(const N64Handle* h);
+
+/// N64_RENDERER_*, and a line saying which GPU (or why the renderer didn't start).
+int n64_renderer(const N64Handle* h);
+const char* n64_renderer_info(const N64Handle* h);
+/// Writes the Vulkan pipeline cache now if it grew (CPU only, no GPU work: safe on the way to the background).
+void n64_save_pipeline_cache(N64Handle* h);
 
 /// Video fields per second (60 NTSC, 50 PAL), from the cartridge's region.
 double n64_frame_rate(const N64Handle* h);
@@ -97,5 +123,6 @@ uint32_t n64_peek_rdram(const N64Handle* h, uint32_t address);
 #endif
 
 #include "N64BenchGlue.h"   // the hidden N64 speed test
+#include "N64PipelineCache.h"   // the renderer's pipeline cache file format (tested on the Mac)
 
 #endif

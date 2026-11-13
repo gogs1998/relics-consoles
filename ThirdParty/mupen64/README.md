@@ -314,3 +314,6 @@ compiled only through our units in `glue/rdp` (cxd4: signal handlers and `srand`
 `cxd4_unit.c`; paraLLEl: `volk_rename.h` first). Without Vulkan (simulator, Mac tests) the glue still falls back
 to the VI scan-out above. Measurements: `docs/n64-rdp-spike.md`. In Release only the hidden speed test reaches it
 (About › long-press the version line); N64 games stay Debug-only (`N64_ENABLED`).
+
+**Build 5:** N64 games play in Release through this renderer (asynchronous RDP, 640 x 480 VI output, persistent
+pipeline cache in Application Support); `N64_ENABLED` is gone. Details: `docs/n64-rdp-spike.md` §10.

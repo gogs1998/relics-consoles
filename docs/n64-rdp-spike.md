@@ -227,3 +227,29 @@ iPhone 18 Pro Max (iPhone19,7, A20 Pro), iOS 27.2.1, thermal nominal throughout.
 Faster than the M4 Mac. Worst frame was 24.8 ms on first use (shader build), otherwise under 8 ms.
 **Decision: N64 goes in v2** (threshold was 75 fps busy). Still unknown: older iPhones (A15/A16), real
 games' heavier microcode and CountPerOp, shader-compile stutter (consider a pipeline cache).
+
+## 10. In the app (build 5, 13 Nov 2026): N64 unhidden
+
+N64 games now play in Release builds (the `N64_ENABLED` flag, the Release Info.plist stripping and the "isn't
+available in this version yet" import refusal are gone). What a game gets on a device:
+
+- **Renderer:** paraLLEl-RDP on MoltenVK + cxd4, **asynchronous** (only the VI scan-out waits for the GPU;
+  `N64System(synchronousRDP:)` flips it if a game misbehaves). The VI's 640 x 480 output (PAL 640 x 576, resampled)
+  is read back and handed to our Metal renderer as a 640 x 480 frame (4:3); the layout treats it as 320 x 240 like
+  SNES hi-res. Pacing stays the session's own (60 VI/s NTSC, 50 PAL, ±0.5 % audio rate control).
+- **Pipeline cache:** Granite's `VkPipelineCache` is loaded before the command processor is built and saved to
+  `Application Support/N64 Renderer/vulkan-pipelines.bin` (excluded from backups) when play pauses (menu,
+  background, lid closed; CPU only, no GPU work) and when the game closes. Our file header
+  (`N64PipelineCache.h`: magic, format, vendor/device/driver, pipelineCacheUUID, length, FNV-1a checksum) and the
+  Vulkan header inside are checked before Vulkan sees the data; any mismatch deletes the file and starts fresh.
+  paraLLEl already compiles specialised pipelines on a worker thread with an ubershader fallback, so no explicit
+  pre-warm: the fixed pipelines build during boot (black screen), and the cache makes later sessions start warm.
+- **Fallback:** when Vulkan isn't there (simulator, Mac tests) the VI scan-out runs as before; the RDP command
+  stream is still consumed and SyncFull still raises the DP interrupt, so games keep running. When it should have
+  worked (a device) `n64_renderer` reports `N64_RENDERER_VI_FAILED` and the player shows a notice over the game
+  ("Nintendo 64 graphics couldn't start on this device (reason)…") instead of a silent black screen.
+- **States:** taken at the frame boundary, where the VI scan-out has already waited for the GPU, so nothing is in
+  flight; a half-received RDP command is dropped on load. **Rewind is off for N64** (8 MB of RDRAM per gzip state,
+  tens of ms each): the rewind keys show "Rewind isn't available for Nintendo 64 games. Use save states instead."
+- The hidden speed test stays in About for TestFlight only (it runs with no pipeline cache and 320 x 240 output, so
+  its numbers stay comparable with §9). **Release prep must remove it.**

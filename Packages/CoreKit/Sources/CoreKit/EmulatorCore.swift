@@ -171,6 +171,12 @@ public protocol EmulatorCore: AnyObject {
     func setTouch(_ point: TouchPoint?)
     /// Sets player `player`'s analog stick for the following frames. Ignored by cores without one.
     func setAnalog(_ stick: AnalogStick, player: Int)
+    /// Something the player must be told about this machine (e.g. the N64 GPU renderer failed to start), or nil.
+    var statusNotice: String? { get }
+    /// False when save states are too big or slow to snapshot for rewind.
+    var supportsRewind: Bool { get }
+    /// Called on the emulation thread when play pauses (menu, background, lid closed): flush caches to disk.
+    func prepareForSuspend()
 }
 
 public extension EmulatorCore {
@@ -179,6 +185,9 @@ public extension EmulatorCore {
     var screens: [ScreenRegion] { [ScreenRegion(x: 0, y: 0, width: videoSize.width, height: videoSize.height)] }
     func setTouch(_ point: TouchPoint?) {}
     func setAnalog(_ stick: AnalogStick, player: Int) {}
+    var statusNotice: String? { nil }
+    var supportsRewind: Bool { true }
+    func prepareForSuspend() {}
     /// The touch screen, if the system has one.
     var touchScreen: ScreenRegion? { screens.first { $0.isTouch } }
 }

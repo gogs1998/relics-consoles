@@ -31,9 +31,22 @@ typedef struct N64RdpStats {
 
 /// `gfxInfo` is the core's GFX_INFO. Creates the Vulkan device and the paraLLEl-RDP command processor.
 bool n64rdp_gfx_init(const void* gfxInfo);
+/// Saves the pipeline cache, waits for the GPU and tears the renderer down. Safe when init failed.
 void n64rdp_gfx_shutdown(void);
+
+/// Why the RDP is or isn't running (N64_RENDERER_* in Mupen64Glue.h); the reason is in n64rdp_device_info.
+int n64rdp_status(void);
+/// The pipeline cache file (empty or NULL = none). Read at the next n64rdp_gfx_init.
+void n64rdp_set_pipeline_cache_path(const char* path);
+/// Writes the pipeline cache now if it grew since the last write. CPU only (no GPU work, so it is safe while the
+/// app is going to the background). Call only while the core thread is parked or from the core thread.
+void n64rdp_save_pipeline_cache(void);
 void n64rdp_process_rdp_list(void);
-/// Runs the VI on the GPU and writes `width` x `height` 0xAARRGGBB pixels. False when the RDP isn't running.
+/// A save state was loaded: drop any half-received RDP command carried over from before it.
+void n64rdp_state_loaded(void);
+/// Runs the VI on the GPU and writes `width` x `height` 0xAARRGGBB pixels (the VI's 640 x 480 or 640 x 576 output
+/// resampled; both are 4:3). Then waits for the RDP timeline, so at return no GPU work or RDRAM writeback is in flight
+/// (save states are taken at this boundary). False when the RDP isn't running.
 bool n64rdp_scan_out(uint32_t* fb, int width, int height);
 
 /// RSP dispatcher: graphics tasks (OSTask type 1) go to cxd4, everything else to rsp-hle.

@@ -9,17 +9,23 @@
 
 #include <TargetConditionals.h>
 #include <dlfcn.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <mach/mach_time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
 extern "C" {
 #include "api/m64p_plugin.h"
 #include "n64_rdp.h"
+#include "Mupen64Glue.h"
+#include "N64PipelineCache.h"
 }
 
 #if TARGET_OS_IPHONE && !TARGET_OS_SIMULATOR
@@ -35,6 +41,14 @@ std::unique_ptr<Vulkan::Device> dev;
 std::unique_ptr<RDP::CommandProcessor> proc;
 bool synchronous = true;
 std::string info;
+int status = N64_RENDERER_VI_UNAVAILABLE;
+
+// Persistent VkPipelineCache (N64PipelineCache.h). The lock only guards against a save from the host racing a save
+// from the core thread's shutdown, which the glue's park handshake already rules out.
+std::mutex cacheLock;
+std::string cachePath;
+size_t cacheSavedSize = 0;
+const char* cacheNote = "";
 
 uint32_t cmdData[0x00040000 >> 2];
 int cmdCur = 0, cmdPtr = 0;
@@ -63,7 +77,116 @@ void collect_gpu_time()
     dev->timestamp_log_reset();
 }
 
+N64PipelineCacheID cache_id()
+{
+    N64PipelineCacheID id;
+    const VkPhysicalDeviceProperties& p = dev->get_gpu_properties();
+    id.vendorID = p.vendorID;
+    id.deviceID = p.deviceID;
+    id.driverVersion = p.driverVersion;
+    memcpy(id.uuid, p.pipelineCacheUUID, 16);
+    return id;
+}
+
+/// Before the CommandProcessor exists (its pipelines are created through this cache). Any problem: a fresh cache.
+bool cacheTrial = false;   // a loaded cache whose first frame hasn't been shown yet (the ".loading" sentinel exists)
+
+std::string sentinel_path() { return cachePath + ".loading"; }
+
+void load_pipeline_cache()
+{
+    std::lock_guard<std::mutex> guard(cacheLock);
+    cacheSavedSize = 0;
+    cacheTrial = false;
+    bool loaded = false;
+    if (!cachePath.empty()) {
+        // A cache that passed every check but then crashed or hung the driver last time leaves the sentinel behind:
+        // never feed it to Vulkan again.
+        if (access(sentinel_path().c_str(), F_OK) == 0) {
+            unlink(cachePath.c_str());
+            unlink(sentinel_path().c_str());
+        }
+        const int fd = open(cachePath.c_str(), O_RDONLY | O_CLOEXEC);
+        if (fd >= 0) try {
+            struct stat st;
+            if (fstat(fd, &st) == 0 && S_ISREG(st.st_mode) && st.st_size >= N64_PIPELINE_CACHE_HEADER_SIZE
+                && st.st_size <= (off_t)N64_PIPELINE_CACHE_HEADER_SIZE + N64_PIPELINE_CACHE_MAX_PAYLOAD) {
+                std::vector<uint8_t> file((size_t)st.st_size);   // may throw: caught below, cache discarded
+                size_t got = 0;
+                while (got < file.size()) {
+                    const ssize_t n = read(fd, file.data() + got, file.size() - got);
+                    if (n <= 0) break;
+                    got += (size_t)n;
+                }
+                const N64PipelineCacheID id = cache_id();
+                size_t off = 0, size = 0;
+                if (got == file.size() && n64pc_validate(file.data(), file.size(), &id, &off, &size)) {
+                    const int s = open(sentinel_path().c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+                    if (s >= 0) close(s);
+                    cacheTrial = true;
+                    if (dev->init_pipeline_cache(file.data() + off, size)) {
+                        loaded = true;
+                        cacheSavedSize = size;
+                    }
+                }
+            }
+            close(fd);
+            if (!loaded) unlink(cachePath.c_str());   // stale, corrupt or from another GPU/driver
+        } catch (...) {
+            close(fd);
+            unlink(cachePath.c_str());
+            loaded = false;
+        }
+        if (!loaded && cacheTrial) {
+            unlink(sentinel_path().c_str());
+            cacheTrial = false;
+        }
+    }
+    if (!loaded) dev->init_pipeline_cache(nullptr, 0);
+    cacheNote = loaded ? " | pipeline cache loaded" : (cachePath.empty() ? "" : " | pipeline cache new");
+}
+
+void save_pipeline_cache_locked()
+{
+    if (!dev || cachePath.empty()) return;
+    const size_t size = dev->get_pipeline_cache_size();
+    if (size == 0 || size == cacheSavedSize || size > N64_PIPELINE_CACHE_MAX_PAYLOAD) return;
+    std::vector<uint8_t> file(N64_PIPELINE_CACHE_HEADER_SIZE + size);
+    // The cache may grow between the two calls (pipelines compile on worker threads); Granite then fails the read
+    // (VK_INCOMPLETE) and the next save catches up.
+    if (!dev->get_pipeline_cache_data(file.data() + N64_PIPELINE_CACHE_HEADER_SIZE, size)) return;
+    const N64PipelineCacheID id = cache_id();
+    n64pc_make_header(file.data(), &id, file.data() + N64_PIPELINE_CACHE_HEADER_SIZE, size);
+    const std::string tmp = cachePath + ".tmp";
+    const int fd = open(tmp.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+    if (fd < 0) return;
+    size_t put = 0;
+    while (put < file.size()) {
+        const ssize_t n = write(fd, file.data() + put, file.size() - put);
+        if (n <= 0) break;
+        put += (size_t)n;
+    }
+    const bool closed = close(fd) == 0;
+    const bool ok = put == file.size() && closed;
+    if (ok && rename(tmp.c_str(), cachePath.c_str()) == 0) cacheSavedSize = size;
+    else unlink(tmp.c_str());
+}
+
 }  // namespace
+
+extern "C" void n64rdp_set_pipeline_cache_path(const char* path)
+{
+    std::lock_guard<std::mutex> guard(cacheLock);
+    cachePath = path ? path : "";
+}
+
+extern "C" void n64rdp_save_pipeline_cache(void)
+{
+    std::lock_guard<std::mutex> guard(cacheLock);
+    save_pipeline_cache_locked();
+}
+
+extern "C" int n64rdp_status(void) { return status; }
 
 extern "C" double n64rdp_now_ms(void)
 {
@@ -80,9 +203,39 @@ extern "C" void n64rdp_add_rsp_ms(double ms, bool hle)
     else stats.rspMs += ms;
 }
 
+namespace {
+bool gfx_init_inner();
+}
+
 extern "C" bool n64rdp_gfx_init(const void* gfxInfo)
 {
     gfx = *(const GFX_INFO*)gfxInfo;
+    cmdCur = cmdPtr = 0;
+    bool ok = false;
+    try {
+        ok = gfx_init_inner();
+    } catch (...) {   // Granite/paraLLEl don't throw by design, but allocation can: fall back, never crash
+        info = "the N64 renderer failed to start (exception)";
+        ok = false;
+    }
+    if (!ok) {
+        proc.reset();
+        dev.reset();
+        ctx.reset();
+    }
+    return ok;
+}
+
+namespace {
+bool gfx_init_inner()
+{
+    // Where Vulkan can't exist (simulator, Mac tests without MoltenVK) the VI fallback is expected; on a device a
+    // failure is reported to the player.
+#if TARGET_OS_IPHONE && !TARGET_OS_SIMULATOR
+    status = N64_RENDERER_VI_FAILED;
+#else
+    status = N64_RENDERER_VI_UNAVAILABLE;
+#endif
 #if TARGET_OS_SIMULATOR
     if (true) {   // opens the block the shared failure path below closes
         info = "no Vulkan in the simulator (MoltenVK ships no simulator slice)";
@@ -105,6 +258,9 @@ extern "C" bool n64rdp_gfx_init(const void* gfxInfo)
         info = "no Vulkan loader";
         return false;
     }
+#if !TARGET_OS_IPHONE
+    status = N64_RENDERER_VI_FAILED;   // the Mac bench found MoltenVK: anything from here on is a real failure
+#endif
     ctx.reset(new Vulkan::Context);
     if (!ctx->init_instance_and_device(nullptr, 0, nullptr, 0)) {
         info = "Vulkan instance/device creation failed";
@@ -113,6 +269,7 @@ extern "C" bool n64rdp_gfx_init(const void* gfxInfo)
     }
     dev.reset(new Vulkan::Device);
     dev->set_context(*ctx);
+    load_pipeline_cache();
 
     const size_t rdramSize = gfx.RDRAM_SIZE ? *gfx.RDRAM_SIZE : 0x800000;
     size_t align = dev->get_device_features().host_memory_properties.minImportedHostPointerAlignment;
@@ -121,33 +278,36 @@ extern "C" bool n64rdp_gfx_init(const void* gfxInfo)
     const uintptr_t aligned = base & ~(uintptr_t)(align - 1);
     proc.reset(new RDP::CommandProcessor(*dev, (void*)aligned, base - aligned, rdramSize, rdramSize / 2, 0));
     if (!proc->device_is_supported()) {
-        info = "paraLLEl-RDP: device not supported";
-        proc.reset(); dev.reset(); ctx.reset();
+        info = std::string("this GPU lacks features the N64 renderer needs (") + dev->get_gpu_properties().deviceName + ")";
         return false;
     }
     const auto& f = dev->get_device_features();
     char buf[512];
-    snprintf(buf, sizeof(buf), "%s | Vulkan %u.%u | host-memory import %s (align %zu) | subgroup %u | int8/16 %s",
+    snprintf(buf, sizeof(buf), "%s | Vulkan %u.%u | host-memory import %s (align %zu) | subgroup %u | int8/16 %s%s",
              dev->get_gpu_properties().deviceName, VK_VERSION_MAJOR(dev->get_gpu_properties().apiVersion),
              VK_VERSION_MINOR(dev->get_gpu_properties().apiVersion),
              f.supports_external_memory_host ? "yes" : "no (copy path)", align, f.vk11_props.subgroupSize,
-             (f.enabled_features.shaderInt16 && f.vk12_features.shaderInt8) ? "yes" : "no");
+             (f.enabled_features.shaderInt16 && f.vk12_features.shaderInt8) ? "yes" : "no", cacheNote);
     info = buf;
-    cmdCur = cmdPtr = 0;
+    status = N64_RENDERER_RDP;
     return true;
 }
+}  // namespace
 
 extern "C" void n64rdp_gfx_shutdown(void)
 {
+    n64rdp_save_pipeline_cache();
     if (proc) proc->idle();
     proc.reset();
     dev.reset();
     ctx.reset();
+    status = N64_RENDERER_VI_UNAVAILABLE;
 }
 
 extern "C" void n64rdp_process_rdp_list(void)
 {
-    if (!proc) return;
+    // Without the renderer (simulator, or Vulkan failed) the command stream is still consumed and SyncFull still
+    // raises the DP interrupt, so games keep running (only what the CPU draws shows) instead of waiting forever.
     const double t0 = n64rdp_now_ms();
     double syncMs = 0;
     const uint32_t current = *gfx.DPC_CURRENT_REG & 0x00FFFFF8;
@@ -177,12 +337,12 @@ extern "C" void n64rdp_process_rdp_list(void)
             const unsigned op = (w0 >> 24) & 63;
             const int len = (int)kCmdLen[op];
             if (cmdPtr - cmdCur < len) goto partial;   // the rest of this command comes with the next call
-            if (op >= 8) proc->enqueue_command((unsigned)len * 2, &cmdData[2 * cmdCur]);
+            if (op >= 8 && proc) proc->enqueue_command((unsigned)len * 2, &cmdData[2 * cmdCur]);
             if (op >= 0x08 && op <= 0x0F) stats.triangles++;
             stats.rdpWords += (uint64_t)len;
             if (op == 0x29) {   // SyncFull
                 stats.syncFulls++;
-                if (synchronous) {
+                if (synchronous && proc) {
                     const double s0 = n64rdp_now_ms();
                     proc->wait_for_timeline(proc->signal_timeline());
                     syncMs += n64rdp_now_ms() - s0;
@@ -203,6 +363,8 @@ partial:
     stats.rdpSyncMs += syncMs;
     stats.rdpEnqueueMs += dt - syncMs;
 }
+
+extern "C" void n64rdp_state_loaded(void) { cmdCur = cmdPtr = 0; }
 
 extern "C" bool n64rdp_scan_out(uint32_t* fb, int width, int height)
 {
@@ -227,18 +389,33 @@ extern "C" bool n64rdp_scan_out(uint32_t* fb, int width, int height)
     opts.persist_frame_on_invalid_input = true;
     unsigned w = 0, h = 0;
     proc->scanout_sync(colors, w, h, opts);
-    if (w == 0 || h == 0) {
+    if (w == 0 || h == 0 || colors.size() < (size_t)w * h) {
         for (int i = 0; i < width * height; i++) fb[i] = 0xFF000000u;
     } else {
+        // Nearest resample (identity for NTSC at 640 x 480); the VI output is 4:3 at any size.
+        static std::vector<unsigned> xmap;
+        xmap.resize((size_t)width);
+        for (int x = 0; x < width; x++) xmap[(size_t)x] = (unsigned)((size_t)x * w / (unsigned)width);
         for (int y = 0; y < height; y++) {
-            const RDP::RGBA* row = &colors[(size_t)(y * (int)h / height) * w];
+            const RDP::RGBA* row = &colors[(size_t)((size_t)y * h / (unsigned)height) * w];
+            uint32_t* out = &fb[(size_t)y * (size_t)width];
             for (int x = 0; x < width; x++) {
-                const RDP::RGBA& p = row[x * (int)w / width];
-                fb[y * width + x] = 0xFF000000u | (uint32_t)p.r << 16 | (uint32_t)p.g << 8 | p.b;
+                const RDP::RGBA& p = row[xmap[(size_t)x]];
+                out[x] = 0xFF000000u | (uint32_t)p.r << 16 | (uint32_t)p.g << 8 | p.b;
             }
         }
     }
+    // Make the frame boundary truly idle: scanout_sync waits only for the VI readback, while RDP writebacks into
+    // RDRAM (copy path, or a blank VI that skips the fence) may still be running. Everything is submitted here,
+    // in the foreground frame, so save states never see in-flight GPU writes and the app never submits GPU work
+    // while it sleeps.
+    proc->wait_for_timeline(proc->signal_timeline());
     proc->begin_frame_context();
+    if (cacheTrial) {   // the loaded cache survived pipeline creation and a frame: it's good
+        std::lock_guard<std::mutex> guard(cacheLock);
+        unlink(sentinel_path().c_str());
+        cacheTrial = false;
+    }
     stats.frames++;
     stats.viMs += n64rdp_now_ms() - t0;
     return true;

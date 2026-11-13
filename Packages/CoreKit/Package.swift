@@ -137,7 +137,7 @@ let package = Package(
                 resources: [.copy("Resources/mupen64plus.ini"), .copy("Resources/n64_rdpbench.z64")],
                 swiftSettings: fast),
         .testTarget(name: "CoreKitTests",
-                    dependencies: ["CoreKit", "NESCore", "GBCore", "GBACore", "AresCore", "DSCore", "N64Core"]),
+                    dependencies: ["CoreKit", "NESCore", "GBCore", "GBACore", "AresCore", "DSCore", "N64Core", "MUPEN64"]),
     ],
     cxxLanguageStandard: .cxx20
 )

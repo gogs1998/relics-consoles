@@ -39,9 +39,10 @@ bool n64bench_run(const uint8_t* rom, size_t romSize, const char* workDir, const
     size_t o = 0;
 #define OUT(...) do { if (o < cap) o += (size_t)snprintf(report + o, cap - o, __VA_ARGS__); } while (0)
     report[0] = 0;
-    n64rdp_set_synchronous(synchronous);
+    n64_configure(NULL, synchronous, false);   // no pipeline cache: the bench measures first-use builds too
     setenv("PARALLEL_RDP_BENCH", "1", 1);   // GPU timestamps per render pass (read when the RDP starts)
     N64Handle* h = n64_create(rom, romSize, NULL, 0, workDir, dataDir);
+    unsetenv("PARALLEL_RDP_BENCH");          // games started later must not pay for timestamps
     if (h == NULL) { OUT("n64_create failed\n"); return false; }
     OUT("Device: %s\n", n64rdp_device_info());
     if (strstr(n64rdp_device_info(), " | Vulkan ") == NULL) {   // set only when paraLLEl-RDP is up

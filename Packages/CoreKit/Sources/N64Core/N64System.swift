@@ -9,11 +9,25 @@ import MUPEN64
 /// HLE boot stands in for the PIF boot ROM. mupen64plus keeps one machine in process globals, so only
 /// one `N64System` can be alive at a time (the initialiser throws while another exists).
 ///
-/// Video: no RDP renderer is linked yet (GLideN64 is GPL-2.0-only; see ThirdParty/mupen64/README.md),
-/// so the framebuffer is the VI scan-out of RDRAM: anything the CPU drew is shown, RDP rendering is not.
+/// Video: on iPhone/iPad, paraLLEl-RDP on MoltenVK renders the RDP and runs the VI on the GPU (640 x 480, 4:3);
+/// where Vulkan doesn't exist (simulator, Mac tests) or fails to start, the framebuffer is our VI scan-out of RDRAM
+/// at 320 x 240 (only what the CPU drew shows). `renderer` says which, and `statusNotice` tells the player when a
+/// device's renderer failed.
 public final class N64System: EmulatorCore {
+    /// How the picture is made.
+    public enum Renderer: Equatable, Sendable {
+        /// paraLLEl-RDP on the GPU: real games' graphics.
+        case rdp
+        /// No Vulkan in this build (simulator, Mac): VI scan-out, as designed.
+        case viUnavailable
+        /// The GPU renderer should have started on this device but didn't (the reason): VI scan-out.
+        case viFailed(String)
+    }
+
     public let system = SystemID.n64
-    public let videoSize = VideoSize(width: Int(N64_SCREEN_WIDTH), height: Int(N64_SCREEN_HEIGHT))
+    public var videoSize: VideoSize {
+        VideoSize(width: Int(n64_video_width(handle)), height: Int(n64_video_height(handle)))
+    }
     public let pixelAspect = 1.0
     public let frameRate: Double
     public let audioSampleRate = 48_000.0
@@ -29,7 +43,10 @@ public final class N64System: EmulatorCore {
     /// - Parameters:
     ///   - rom: the ROM in any of the three byte orders (normalised to big-endian here).
     ///   - battery: a blob from `batteryRAM`.
-    public init(rom: Data, battery: Data?) throws {
+    ///   - pipelineCache: where the GPU renderer keeps its Vulkan pipeline cache between sessions (nil = none).
+    ///   - synchronousRDP: the CPU waits for the GPU at every RDP SyncFull (safest for games that read back what the
+    ///     RDP drew); false = only the VI waits (faster). Gameplay uses asynchronous.
+    public init(rom: Data, battery: Data?, pipelineCache: URL? = nil, synchronousRDP: Bool = false) throws {
         guard let z64 = CoreFactory.n64Normalised(rom) else { throw CoreError.unrecognisedFile }
         guard let ini = Bundle.module.url(forResource: "mupen64plus", withExtension: "ini") else {
             throw CoreError.corruptFile("the ROM database is missing")
@@ -37,6 +54,11 @@ public final class N64System: EmulatorCore {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("n64-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        if let pipelineCache {
+            try? FileManager.default.createDirectory(at: pipelineCache.deletingLastPathComponent(),
+                                                     withIntermediateDirectories: true)
+        }
+        n64_configure(pipelineCache?.path, synchronousRDP, true)
         let made: OpaquePointer? = z64.withUnsafeBytes { romBuf in
             let romPtr = romBuf.bindMemory(to: UInt8.self).baseAddress
             let dataDir = ini.deletingLastPathComponent().path
@@ -64,6 +86,29 @@ public final class N64System: EmulatorCore {
     }
 
     public func reset() { n64_reset(handle) }
+
+    public var renderer: Renderer {
+        switch Int(n64_renderer(handle)) {
+        case Int(N64_RENDERER_RDP): return .rdp
+        case Int(N64_RENDERER_VI_FAILED): return .viFailed(String(cString: n64_renderer_info(handle)))
+        default: return .viUnavailable
+        }
+    }
+
+    /// The GPU, or why the renderer didn't start.
+    public var rendererInfo: String { String(cString: n64_renderer_info(handle)) }
+
+    public var statusNotice: String? {
+        guard case .viFailed(let reason) = renderer else { return nil }
+        return "Nintendo 64 graphics couldn't start on this device (\(reason)). Only simple 2D screens will show."
+    }
+
+    /// N64 states hold all 8 MB of RDRAM (gzip, a few MB for a real game, tens of ms to write): too big and slow
+    /// to snapshot every few frames, so rewind is off for Nintendo 64.
+    public var supportsRewind: Bool { false }
+
+    /// Writes the GPU renderer's pipeline cache now (CPU only), so a suspended app that is later killed keeps it.
+    public func prepareForSuspend() { n64_save_pipeline_cache(handle) }
 
     public func setAnalog(_ stick: AnalogStick, player: Int) {
         guard (0..<4).contains(player) else { return }

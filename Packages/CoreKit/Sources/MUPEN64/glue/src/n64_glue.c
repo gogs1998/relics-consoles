@@ -63,7 +63,9 @@ struct N64Handle {
     bool executing;   // M64CMD_EXECUTE is running on the thread
     bool limiterOff;
 
-    uint32_t fb[N64_SCREEN_WIDTH * N64_SCREEN_HEIGHT];
+    uint32_t fb[N64_MAX_VIDEO_WIDTH * N64_MAX_VIDEO_HEIGHT];
+    int fbWidth, fbHeight;   // 640 x 480 from the RDP (full resolution), else 320 x 240
+    bool fullResolution;   // hand the RDP's 640 x 480 VI output on unscaled
     uint32_t frames;
     BUTTONS pads[N64_MAX_PLAYERS];
 
@@ -78,6 +80,10 @@ struct N64Handle {
 };
 
 static N64Handle* g_h;   // the one live machine (mupen64plus is process-global)
+// n64_configure's options, applied by the next n64_create (never to a running machine).
+static char g_cfgCachePath[1100];
+static bool g_cfgSynchronous = true;
+static bool g_cfgFullResolution;
 static GFX_INFO g_gfx;
 static AUDIO_INFO g_audio;
 static CONTROL* g_controls;
@@ -125,10 +131,18 @@ static void* core_thread(void* arg)
 
 static inline uint32_t expand5(uint32_t v) { return (v << 3) | (v >> 2); }
 
-/// Copies the framebuffer the VI is showing into `fb`, scaled to 320 x 240.
+/// Copies the framebuffer the VI is showing into `fb`: the RDP's VI output (device), else our scan-out at 320 x 240.
 static void scan_out(N64Handle* h)
 {
-    if (n64rdp_scan_out(h->fb, N64_SCREEN_WIDTH, N64_SCREEN_HEIGHT)) return;   // the RDP is running (device)
+    const int w = h->fullResolution ? N64_MAX_VIDEO_WIDTH : N64_SCREEN_WIDTH;
+    const int ht = h->fullResolution ? N64_MAX_VIDEO_HEIGHT : N64_SCREEN_HEIGHT;
+    if (n64rdp_scan_out(h->fb, w, ht)) {   // the RDP is running (device)
+        h->fbWidth = w;
+        h->fbHeight = ht;
+        return;
+    }
+    h->fbWidth = N64_SCREEN_WIDTH;
+    h->fbHeight = N64_SCREEN_HEIGHT;
     const uint32_t status = *g_gfx.VI_STATUS_REG;
     const uint32_t type = status & 3;
     const uint32_t width = *g_gfx.VI_WIDTH_REG & 0xFFF;
@@ -194,10 +208,14 @@ static void v_UpdateScreen(void)
             // interrupt handler continues exactly as the saved machine would have.
             savestates_set_job(savestates_job_load, savestates_type_m64p, h->statePath);
             h->result = savestates_load();
-            if (h->result) scan_out(h);
+            if (h->result) {
+                n64rdp_state_loaded();
+                scan_out(h);
+            }
             break;
         case CMD_RESET:
             main_reset(1);   // applied at the next interrupt
+            n64rdp_state_loaded();   // drop any half-received RDP command
             break;
         case CMD_QUIT:
             main_stop();
@@ -230,13 +248,14 @@ static void v_ViWidthChanged(void) {}
 static void v_ReadScreen2(void* dest, int* width, int* height, int front)
 {
     (void)front;
-    if (width) *width = N64_SCREEN_WIDTH;
-    if (height) *height = N64_SCREEN_HEIGHT;
+    const int fw = g_h ? g_h->fbWidth : N64_SCREEN_WIDTH, fh = g_h ? g_h->fbHeight : N64_SCREEN_HEIGHT;
+    if (width) *width = fw;
+    if (height) *height = fh;
     if (dest != NULL && g_h != NULL) {   // RGB888, bottom row first (the core's screenshot format)
         uint8_t* d = (uint8_t*)dest;
-        for (int y = N64_SCREEN_HEIGHT - 1; y >= 0; y--)
-            for (int x = 0; x < N64_SCREEN_WIDTH; x++) {
-                uint32_t p = g_h->fb[y * N64_SCREEN_WIDTH + x];
+        for (int y = fh - 1; y >= 0; y--)
+            for (int x = 0; x < fw; x++) {
+                uint32_t p = g_h->fb[y * fw + x];
                 *d++ = (uint8_t)(p >> 16); *d++ = (uint8_t)(p >> 8); *d++ = (uint8_t)p;
             }
     }
@@ -516,6 +535,11 @@ N64Handle* n64_create(const uint8_t* rom, size_t romSize, const uint8_t* battery
     pthread_mutex_init(&h->lock, NULL);
     pthread_cond_init(&h->cond, NULL);
     for (size_t i = 0; i < N64_SCREEN_WIDTH * N64_SCREEN_HEIGHT; i++) h->fb[i] = 0xFF000000u;
+    h->fbWidth = N64_SCREEN_WIDTH;
+    h->fbHeight = N64_SCREEN_HEIGHT;
+    h->fullResolution = g_cfgFullResolution;
+    n64rdp_set_pipeline_cache_path(g_cfgCachePath);   // read by the renderer at RomOpen, below
+    n64rdp_set_synchronous(g_cfgSynchronous);
 
     if (CoreStartup(FRONTEND_API_VERSION, g_n64_work_dir, g_n64_data_dir, NULL, debug_callback, NULL,
                     state_callback) != M64ERR_SUCCESS) {
@@ -601,7 +625,6 @@ void n64_destroy(N64Handle* h)
     if (h == NULL) return;
     if (h->executing) host_send(h, CMD_QUIT);
     pthread_join(h->thread, NULL);
-    g_h = NULL;
     CoreDetachPlugin(M64PLUGIN_GFX);
     CoreDetachPlugin(M64PLUGIN_AUDIO);
     CoreDetachPlugin(M64PLUGIN_INPUT);
@@ -612,6 +635,9 @@ void n64_destroy(N64Handle* h)
     CoreShutdown();
     pthread_mutex_destroy(&h->lock);
     pthread_cond_destroy(&h->cond);
+    // Cleared last: until the core is fully shut down, n64_create (the speed test) must still see a live machine.
+    // The plugin callbacks check g_h, but none runs once the core thread has been joined.
+    g_h = NULL;
     free(h);
 }
 
@@ -650,6 +676,33 @@ void n64_run_frame(N64Handle* h)
 }
 
 const uint32_t* n64_framebuffer(const N64Handle* h) { return h->fb; }
+int n64_video_width(const N64Handle* h) { return h->fbWidth; }
+int n64_video_height(const N64Handle* h) { return h->fbHeight; }
+
+void n64_configure(const char* pipelineCachePath, bool synchronousRdp, bool fullResolution)
+{
+    snprintf(g_cfgCachePath, sizeof(g_cfgCachePath), "%s", pipelineCachePath ? pipelineCachePath : "");
+    g_cfgSynchronous = synchronousRdp;
+    g_cfgFullResolution = fullResolution;
+}
+
+int n64_renderer(const N64Handle* h)
+{
+    (void)h;
+    return n64rdp_status();
+}
+
+const char* n64_renderer_info(const N64Handle* h)
+{
+    (void)h;
+    return n64rdp_device_info();
+}
+
+void n64_save_pipeline_cache(N64Handle* h)
+{
+    (void)h;   // the core thread is parked whenever the host holds the handle, so this can't race the renderer
+    n64rdp_save_pipeline_cache();
+}
 
 double n64_frame_rate(const N64Handle* h)
 {
