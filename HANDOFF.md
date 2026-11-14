@@ -76,6 +76,11 @@ The Duo shots come from DEBUG `-pose` captures cropped to the Duo's 1.42 canvas,
   layout editor, and the shelf with only the 5 demos.
 - **Copies** of the Duo shots are in side-session-notes `duo-shots/games/inner` and `duo-shots/games/outer`.
 
+**TestFlight build 7: NOT uploaded yet.** The disk sat at 3.7 to 3.9 GB for 40 minutes, and the rule is not to archive
+below 4 GB. Everything for build 7 is committed. To upload: `cd ~/duo-emulator && xcodegen generate && rm -rf build &&
+~/duo-remote/Tools/upload.sh /Users/gordonshepherd/duo-emulator DuoEmulator /private/tmp/relics-b7`, then
+`rm -rf /private/tmp/relics-b7`.
+
 **Tests:** app unit tests 33 pass (Shared iPhone 17e). CoreKit 104 pass. Release device check: zero warnings (only the
 appintentsmetadataprocessor tool line), ROM allowlist passes with exactly the five demos.
 
