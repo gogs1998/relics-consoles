@@ -1,4 +1,76 @@
-# HANDOFF: Duo Emulator ("Foldback")
+# HANDOFF: Relics: Games (repo "duo-emulator", ASC record "Foldback")
+
+## Ready to submit: what's left for Gordon (14 Nov 2026, v1.0 build 7)
+Nothing has been sent to App Review and the public repo does not exist yet. In order:
+1. **Contact email (ship-blocker).** Send the address. It goes in ONE place: `AppLinks.contactEmail` in
+   `App/Library/AboutView.swift` (now `CONTACT_EMAIL_TBD`). Build 7 carries the placeholder, so a new build (8) is
+   needed after the change: Fable ruled a placeholder in the binary a 2.1 rejection. Also used on the support and privacy pages.
+2. **DuoKit licence (ship-blocker).** `gogs1998/iqlabs-duokit` is private with no LICENSE. In a GPLv3 app it is part of
+   the Corresponding Source: add an MIT (or GPLv3) LICENSE and make it public before submission.
+3. **Create the public repo `gogs1998/relics-games`** (default branch `main`, the credits link `/tree/main/release-sources`),
+   push this repo, tag the submitted build's commit (e.g. `v1.0-build8`), check it loads logged out. Before pushing,
+   check the history for anything that must not be public (`Local.xcconfig` and `TestSuites/` are gitignored;
+   `ThirdParty-src/` too). It must be public **before** pressing Submit (Fable).
+4. **Support URL and privacy-policy URL** (ASC won't submit without them): pages in the Relics pattern; copy in
+   `docs/store/privacy-and-age-rating.md`.
+5. **ASC:** price £3.99; paste the copy from `docs/store/listing.md` (name, subtitle, promo, description, keywords) and
+   the review notes from `docs/store/review-notes.md`; App Privacy = Data Not Collected; age rating questionnaire as in
+   `docs/store/privacy-and-age-rating.md` (expect 4+, accept 9+).
+6. **Screenshots:** upload `docs/store/shots/` (Duo inner, Duo outer, iPhone 6.9"); also in side-session-notes duo-shots/games/.
+7. **N64 decision:** the copy lists Nintendo 64. If Gordon's own N64 games didn't pass on TestFlight, delete the N64
+   lines in the listing/review notes AND remove the N64 core, mupen64plus.ini, MoltenVK and the N64 About rows from the
+   build (a dormant core is a 2.3.1 problem).
+8. **Gordon's OK to submit.** Nobody submits without it.
+
+## Update, 14 Nov 2026 (release prep, build 7)
+Done and committed (5becb5b, 4c06a58, 97d7671, plus the docs commit):
+- **Hidden N64 speed test removed** (About long-press, `N64SpeedTestView`, `N64SpeedTest`, bench ROM resource, its
+  allowlist entry: the Release ROM check is back to exactly the five demos). The bench runner and ROM moved to
+  `Spikes/N64RDP/` so the Mac CLI bench still builds; `Tools/build_n64_bench_rom.py` now writes there.
+- **Version 1.0 (7)** in `project.yml`.
+- **Licences:** cereal's BSD-3 text made verbatim from cereal `a56bad8` (the revision MoltenVK v1.4.2 pins; the old
+  disclaimer named the authors). `release-sources/` holds the exact upstream source archives of µCity 1.3, Thwaite 0.03,
+  Alex vs Bus pre3 and MoltenVK v1.4.2 with SHA-256s; the three shipped demo ROMs match the authors' releases byte for
+  byte. Alex vs Bus credits from its `docs/Authors.md` added (fonts Telegrama/YoWorks, Press Start 2P/codeman38);
+  µCity's readme lists no third-party assets. Thwaite's source URL fixed (`pineight.com/nes/thwaite-0.03.zip`).
+- **About:** "Source code" row (github.com/gogs1998/relics-games) and "Contact" row from `AppLinks.contactEmail`
+  (placeholder `CONTACT_EMAIL_TBD`, one constant). DuoKit credited as our own.
+- **Privacy manifest:** SystemBootTime 35F9.1 added (frame pacing uses mach_absolute_time / CACurrentMediaTime).
+- **Store docs:** `docs/store/listing.md`, `review-notes.md`, `privacy-and-age-rating.md`, `compose.swift`
+  (screenshot composer, exact sizes, Graphite/Ember).
+- **CoreKit tests:** 104 pass (Mac). The simulator Debug build had zero warnings (before the uncommitted edits below).
+- **Fable review (one pass):** must-fixes = placeholder email in the binary, repo must be public before Submit,
+  DuoKit needs a licence + public repo, support/privacy URLs; all are in "Ready to submit" above. Shoulds applied:
+  promo no longer says "Made for iPhone" (MFi wording) -> "Built around iPhone Duo", "GPL version 3 or later",
+  Nintendo/Sega non-affiliation line in the listing, keyword `arcade` -> `pixel`, "version pre3" in the notes,
+  MoltenVK source mirrored, privacy reason added. Rulings: system names in description OK (not in name/subtitle/
+  keywords/captions); DS test-cart picture in a screenshot OK if not captioned as an included game; mupen64plus.ini
+  low risk; 4+ defensible, accept 9+.
+
+**Right-side status bar (task 1): code audit only, NOT verified in a Duo simulator.** Every layout (shelf, all
+player poses, DS, N64 deck, table tray, book, landscape, editor, menus) is placed with absolute rects inside the
+`DuoStageReader` GeometryReader, which respects the safe area: `stage.bounds`/`canvas`/halves already exclude any
+trailing inset the system reports, and nothing in the app uses `ignoresSafeArea` for content (only the background
+surface and the sleep veil), `UIScreen` bounds or global coordinates. So nothing sits under a right-edge bar *if iOS
+reports it as a trailing safe-area inset*. Not checked: that the Duo sim/device actually reports it that way, and
+what happens with `.statusBarHidden(true)` in the player. Blocked because 3 simulators were already booted (rule: 2),
+the only booted Duo sim belongs to Relics (off-limits) and the disk stayed at 2.3-3.3 GB (build rule: 4 GB).
+"Games Duo" (7C3DCA79, iPhone-Duo type, iOS 27.1) is created but has never been booted.
+
+**Uncommitted, unbuilt (disk < 4 GB):** `App/App/DuoEmulatorApp.swift` DEBUG `-forceFold YES` (treat the Duo sim's
+real division region as folded: table/book at real size), `-logStage YES`, `-fakeTrailingInset 54` (red band added to
+the trailing safe area to prove nothing lands under it); `GameStore` DEBUG `-noTestCarts YES`; `PlayerView` keeps
+the micro sign in the bezel label (it showed "ΜCITY": `"µ".uppercased()` is Greek capital Mu). Build, then commit.
+
+**Not done yet (all need a build or a simulator):** app unit tests, Release check, Duo screenshots (inner/outer),
+the final iPhone 6.9" set, TestFlight build 7. Provisional 6.9" shots (1320x2868, composed):
+`docs/store/shots/iphone69-provisional/` (Thwaite, landscape Alex vs Bus, layout editor); raw captures in
+`docs/store/shots/captures/`. Still needed for 6.9": µCity (after the label fix) and the shelf with `-noTestCarts`.
+No DS homebrew demo exists, so the DS table shot can only use our own DS test cart (Fable: OK, don't caption it as an
+included game). On the outer screen a closed Duo shows the "Sleeping" veil over a game (close-to-sleep design), so
+outer shots can be the shelf, the veil and settings, not live play.
+
+---
 
 ## Update, 13 Nov 2026 (build 6: big N64 deck, C stick option, bigger C buttons)
 **Build 6 uploaded to TestFlight** (internal only, archive CFBundleVersion 6; never submitted for review).

@@ -118,7 +118,10 @@ Fable review changes in §10) and `docs/research.md` (App Store 4.7, core licens
 `-openMenu YES`, `-freshStart YES` (ignore the auto-save), `-resetLayouts YES` (built-in touch layouts),
 `-keepTouchControls YES` (the simulator may expose a virtual "Gamepad", which hides the touch controller),
 `-fakeController YES` (pretend a pad is connected), `-lidCycle 3,8` (fake Duo close/open),
-`-editControls YES`, `-openSettings YES`.
+`-editControls YES`, `-openSettings YES`, `-forceFold YES` (on the iPhone Duo simulator, treat the real division
+region as folded: table in portrait, book in landscape; the sim's hinge only moves in DeviceHub), `-noTestCarts YES` (shelf without our test carts), `-fakeTrailingInset 54` (a red band added to the trailing safe area,
+standing in for the Duo's right-edge status bar), `-logStage YES` (NSLog
+the stage bounds, safe area and fold).
 - Controls: `ControllerLayout` (presets: standard, 6-Button Arcade), `LayoutStore` (game → system → preset),
   `LayoutEditor` + `LayoutEditorArea` + `LayoutEditorPanel`; `GamepadHub` (GameController + keyboard, players,
   hotkeys via CoreKit `InputMapper`, remap capture), `ControllersSheet`, `ControllerCompanion`.
