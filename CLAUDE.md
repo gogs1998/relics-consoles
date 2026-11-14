@@ -1,4 +1,4 @@
-# CLAUDE.md: Duo Emulator (working title "Foldback")
+# CLAUDE.md: Relics: Games (Duo emulator; repo and bundle id still say DuoEmulator, ASC record was "Foldback")
 
 A Duo-first multi-system retro game emulator for the iPhone Duo, also for ordinary iPhone and iPad.
 Players load games they own through the Files picker; nothing is downloaded. Freely licensed homebrew demos may be bundled (`docs/homebrew-candidates.md`). Read

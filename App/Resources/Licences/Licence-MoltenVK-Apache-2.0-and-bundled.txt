@@ -9,7 +9,8 @@ Used for: Vulkan on Apple's Metal, so the N64 graphics renderer (paraLLEl-RDP) c
   Source: https://github.com/KhronosGroup/SPIRV-Cross
 - Vulkan-Headers (inside MoltenVK and bundled with paraLLEl-RDP), Copyright 2015-2024 The Khronos Group Inc.,
   Apache License 2.0. Source: https://github.com/KhronosGroup/Vulkan-Headers
-- cereal (inside MoltenVK), BSD 3-Clause licence, below. Source: https://github.com/USCiLab/cereal
+- cereal (inside MoltenVK), BSD 3-Clause licence, below (verbatim from cereal commit a56bad8, the revision
+  MoltenVK v1.4.2 pins in ExternalRevisions/cereal_repo_revision). Source: https://github.com/USCiLab/cereal
 
 Apache License 2.0
 ------------------
@@ -234,7 +235,7 @@ modification, are permitted provided that the following conditions are met:
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
 ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
 WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL RANDOLPH VOORHIES OR SHANE GRANT BE LIABLE FOR ANY
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY
 DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
 (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
 LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
