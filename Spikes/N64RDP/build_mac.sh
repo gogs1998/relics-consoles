@@ -3,7 +3,7 @@
 # glue/rdp: paraLLEl-RDP + cxd4) into build/n64rdp-spike/mac. Vulkan comes from a macOS libMoltenVK.dylib in
 # ThirdParty-src/moltenvk/macos (see docs/n64-rdp-spike.md §How to rebuild).
 # Usage: Spikes/N64RDP/build_mac.sh
-#   N64RDP_ROOT=$PWD build/n64rdp-spike/mac/n64rdp_bench Packages/CoreKit/Sources/N64Core/Resources/n64_rdpbench.z64
+#   N64RDP_ROOT=$PWD build/n64rdp-spike/mac/n64rdp_bench Spikes/N64RDP/rom-n64_rdpbench.z64
 set -e
 cd "$(dirname "$0")/../.."
 ROOT=$PWD
@@ -17,7 +17,7 @@ P=$M/parallel-rdp
 mkdir -p $OUT/obj
 
 COMMON=(-O2 -arch arm64 -mmacosx-version-min=26.0 -w -DNDEBUG)
-INC=(-I$M/glue/shim -I$M/glue/include -I$M/mupen64plus-core/src -I$M/mupen64plus-core/src/api
+INC=(-I$ROOT/Spikes/N64RDP/bench -I$M/glue/rdp -I$M/glue/shim -I$M/glue/include -I$M/mupen64plus-core/src -I$M/mupen64plus-core/src/api
      -I$M/mupen64plus-core/subprojects -I$M/mupen64plus-core/subprojects/md5 -I$M/mupen64plus-core/subprojects/xxhash
      -I$P/parallel-rdp -I$P/volk -I$P/vulkan -I$P/vulkan-headers/include -I$P/util
      -DNO_ASM -DNOCRYPT -DNOUNCRYPT -fno-strict-aliasing)
@@ -31,6 +31,7 @@ for f in $(cd $M && find mupen64plus-core/src mupen64plus-core/subprojects rsp-h
     *)     jobs+=("clang -std=gnu11 ${COMMON[*]} ${INC[*]} -c $M/$f -o $OUT/obj/m_${f//\//_}.o") ;;
   esac
 done
+jobs+=("clang -std=gnu11 ${COMMON[*]} ${INC[*]} -c $ROOT/Spikes/N64RDP/bench/n64_bench.c -o $OUT/obj/n64_bench.o")
 jobs+=("clang -std=gnu11 ${COMMON[*]} ${INC[*]} -c $ROOT/Spikes/N64RDP/bench/bench_mac.c -o $OUT/obj/bench_mac.o")
 printf '%s\0' "${jobs[@]}" | xargs -0 -P 8 -n 1 sh -c
 clang++ -arch arm64 -mmacosx-version-min=26.0 $OUT/obj/*.o -lz -o $OUT/n64rdp_bench

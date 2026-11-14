@@ -134,7 +134,7 @@ let package = Package(
                 publicHeadersPath: "glue/include", cSettings: mupenRdpC, cxxSettings: mupenRdpCXX,
                 linkerSettings: [.linkedLibrary("z")]),
         .target(name: "N64Core", dependencies: ["CoreKit", "MUPEN64"],
-                resources: [.copy("Resources/mupen64plus.ini"), .copy("Resources/n64_rdpbench.z64")],
+                resources: [.copy("Resources/mupen64plus.ini")],
                 swiftSettings: fast),
         .testTarget(name: "CoreKitTests",
                     dependencies: ["CoreKit", "NESCore", "GBCore", "GBACore", "AresCore", "DSCore", "N64Core", "MUPEN64"]),

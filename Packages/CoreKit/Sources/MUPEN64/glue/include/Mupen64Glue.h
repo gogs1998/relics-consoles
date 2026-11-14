@@ -122,7 +122,6 @@ uint32_t n64_peek_rdram(const N64Handle* h, uint32_t address);
 }
 #endif
 
-#include "N64BenchGlue.h"   // the hidden N64 speed test
 #include "N64PipelineCache.h"   // the renderer's pipeline cache file format (tested on the Mac)
 
 #endif

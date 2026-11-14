@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Builds our own heavy RDP/RSP benchmark cartridge for the hidden N64 speed test (docs/n64-rdp-spike.md):
-Packages/CoreKit/Sources/N64Core/Resources/n64_rdpbench.z64 (shipped; allowed by name + SHA-256 in project.yml's
-Release ROM check, so update that hash whenever this output changes).
+"""Builds our own heavy RDP/RSP benchmark cartridge for the N64 speed test (Mac CLI) (docs/n64-rdp-spike.md):
+Spikes/N64RDP/rom-n64_rdpbench.z64 (for the Mac CLI bench, Spikes/N64RDP/build_mac.sh). Not shipped: the in-app
+speed test was removed for release (build 7).
 
 Run from the repo root: python3 Tools/build_n64_bench_rom.py
 Everything is ours: the CPU program and the boot stub use the MIPS assembler from Tools/build_n64_roms.py, the RSP
@@ -37,7 +37,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'Tools'))
 from build_n64_roms import MIPS, REGS, boot_stub as _unused_boot_stub  # noqa: E402,F401
 
-OUT = os.path.join(ROOT, 'Packages', 'CoreKit', 'Sources', 'N64Core', 'Resources', 'n64_rdpbench.z64')
+OUT = os.path.join(ROOT, 'Spikes', 'N64RDP', 'rom-n64_rdpbench.z64')
 
 # RDRAM (physical) layout
 CODE = 0x400

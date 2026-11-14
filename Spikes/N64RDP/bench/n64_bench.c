@@ -1,4 +1,4 @@
-// N64 speed test runner (the hidden About › version long-press screen and the Mac CLI). Part of Relics: Games
+// N64 speed test runner for the Mac CLI spike (moved out of the app for release). Part of Relics: Games
 // (GPLv3). See N64BenchGlue.h.
 #include "N64BenchGlue.h"
 
@@ -7,7 +7,7 @@
 #include <string.h>
 
 #include "Mupen64Glue.h"
-#include "../rdp/n64_rdp.h"
+#include "n64_rdp.h"   // CoreKit MUPEN64/glue/rdp (build_mac.sh adds it to the include path)
 
 enum { LEVELS = 3, WARMUP = 40, MAX_FRAMES = 1200 };
 

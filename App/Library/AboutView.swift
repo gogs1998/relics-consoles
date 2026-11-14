@@ -1,9 +1,15 @@
 import SwiftUI
 
+/// Where the app's source lives and how to reach us. The contact address is a placeholder until Gordon supplies it:
+/// change `contactEmail` (the only place it appears) before submitting (HANDOFF.md, "Ready to submit").
+enum AppLinks {
+    static let sourceCode = "https://github.com/gogs1998/relics-games"
+    static let contactEmail = "CONTACT_EMAIL_TBD"
+}
+
 /// About: what the app is (and isn't), the non-affiliation line, and the licences.
 struct AboutView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var showSpeedTest = false
 
     private struct Licence: Identifiable {
         let id: String
@@ -57,6 +63,14 @@ struct AboutView: View {
                     Text("The NES and Game Boy / Game Boy Color cores, the app, its controller and art are original IQ Labs work.")
                     Text("Relics: Games © 2026 IQ Labs. It is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License, version 3 or (at your option) any later version. It comes with NO WARRANTY. See GNU GPL 3.0 below.")
                         .foregroundStyle(.secondary)
+                    LabeledContent("Source code") {
+                        Text(AppLinks.sourceCode).textSelection(.enabled)
+                    }
+                    .accessibilityElement(children: .combine)
+                    LabeledContent("Contact") {
+                        Text(AppLinks.contactEmail).textSelection(.enabled)
+                    }
+                    .accessibilityElement(children: .combine)
                 }
                 Section("Free demos") {
                     licenceLink(Licence(id: "demos", title: "Demos on your shelf",
@@ -70,18 +84,11 @@ struct AboutView: View {
                     Text("No accounts, no ads, no analytics. Nothing leaves your device.")
                 }
                 Section {
-                    // Long-press opens the hidden N64 speed test (N64SpeedTestView). TestFlight only: release prep
-                    // must remove this gesture and N64SpeedTestView (HANDOFF.md).
                     Text(versionLine)
                         .font(.rounded(.footnote))
                         .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(Rectangle())
-                        .onLongPressGesture(minimumDuration: 1) { showSpeedTest = true }
-                        .accessibilityAction(named: "N64 speed test") { showSpeedTest = true }
                 }
             }
-            .navigationDestination(isPresented: $showSpeedTest) { N64SpeedTestView() }
             .navigationTitle("About")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
