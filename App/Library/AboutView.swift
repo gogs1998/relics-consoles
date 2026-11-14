@@ -60,7 +60,7 @@ struct AboutView: View {
                         .foregroundStyle(.secondary)
                 }
                 Section("Our own work") {
-                    Text("The NES and Game Boy / Game Boy Color cores, the app, its controller and art are original IQ Labs work.")
+                    Text("The NES and Game Boy / Game Boy Color cores, the app, its controller and art, and DuoKit (its iPhone Duo fold and hinge layer, github.com/gogs1998/iqlabs-duokit) are original IQ Labs work.")
                     Text("Relics: Games © 2026 IQ Labs. It is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License, version 3 or (at your option) any later version. It comes with NO WARRANTY. See GNU GPL 3.0 below.")
                         .foregroundStyle(.secondary)
                     LabeledContent("Source code") {

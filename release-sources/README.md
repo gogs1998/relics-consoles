@@ -19,3 +19,14 @@ Concentration Room 0.02's GPL licence has an exception allowing exact copies of 
 (source anyway: https://pineight.com/croom/).
 
 Licences and credits for each demo: `Licenses/demos-credits.txt` (also in the app under About › Free demos).
+
+## MoltenVK (prebuilt library in the app)
+The app links the unmodified prebuilt `libMoltenVK.a` from MoltenVK's v1.4.2 release (Apache-2.0). Its source is kept
+here too, since the app as a whole is GPLv3:
+
+| Component | Archive here | Downloaded from | SHA-256 |
+|---|---|---|---|
+| MoltenVK v1.4.2 | `MoltenVK-1.4.2.tar.gz` | https://github.com/KhronosGroup/MoltenVK/archive/refs/tags/v1.4.2.tar.gz | `6864db532f1dbbdb621a8d0ec13f24edae318fd9269dd3dd0cdff791334bb1cb` |
+
+Its build fetches pinned dependencies listed in the archive's `ExternalRevisions/` (SPIRV-Cross, Vulkan-Headers, cereal
+`a56bad8…` and others), each from its public upstream repository.

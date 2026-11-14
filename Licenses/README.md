@@ -1,10 +1,11 @@
 # Third-party licences
 
-Foldback's NES and Game Boy / Game Boy Color cores, the app, its art and its test ROMs are our own.
+Relics: Games' NES and Game Boy / Game Boy Color cores, the app, its art and its test ROMs are our own.
 These third-party components are compiled into the app:
 
 | Component | Used for | Licence | Source | Modified? |
 |---|---|---|---|---|
+| DuoKit (from 0.1.2) | fold, hinge and pose handling for iPhone Duo | IQ Labs' own code; **must get a GPLv3-compatible licence (MIT or GPLv3) and a public repo before submission** (Corresponding Source) | https://github.com/gogs1998/iqlabs-duokit (private today) | n/a (ours) |
 | mGBA (commit 662dada) | Game Boy Advance core, incl. its built-in (HLE) BIOS | MPL-2.0 (`mGBA-MPL-2.0.txt`) | https://github.com/mgba-emu/mgba | No (unmodified files in `Packages/CoreKit/Sources/MGBA/mgba`; any future change goes in `ThirdParty/mgba/patches/` and must be published) |
 | inih (inside mGBA) | mGBA's config parser | BSD-3-Clause (`inih-BSD-3-Clause.txt`) | via mGBA | No |
 | ares (commit 0b92893) | SNES and Mega Drive cores, nall, libco | ISC (`ares-ISC-and-bundled.txt`) | https://github.com/ares-emulator/ares | No (our stand-in headers live in `Sources/ARES/glue/shim`) |
@@ -26,8 +27,8 @@ These third-party components are compiled into the app:
 Five freely licensed homebrew games ship as separate game files in `App/Resources/Demos/` and are copied onto the
 shelf on first launch (deletable, never re-seeded). Each is the author's unmodified build. Credits, notices and
 source locations: `demos-credits.txt`; full texts `GPL-3.0.txt` and `CC-BY-SA-4.0.txt`. The Release ROM check in
-`project.yml` allows exactly these five files plus our own N64 speed-test ROM
-(`CoreKit_N64Core.bundle/n64_rdpbench.z64`, built by `Tools/build_n64_bench_rom.py`), by name and SHA-256.
+`project.yml` allows exactly these five files, by name and SHA-256. The exact upstream source archives of the three
+GPL demos (µCity 1.3, Thwaite 0.03, Alex vs Bus pre3) are kept in `release-sources/` for GPLv3 §6.
 
 | Demo | System | Author | Licence | Source |
 |---|---|---|---|---|
