@@ -23,7 +23,7 @@ Nothing has been sent to App Review and the public repo does not exist yet. In o
 8. **Gordon's OK to submit.** Nobody submits without it.
 
 ## Update, 14 Nov 2026 (release prep, build 7)
-Done and committed (5becb5b, 4c06a58, 97d7671, plus the docs commit):
+Commits 5becb5b, 4c06a58, 97d7671, eed8236, 7e8a6dd (+ the build-7 HANDOFF commit):
 - **Hidden N64 speed test removed** (About long-press, `N64SpeedTestView`, `N64SpeedTest`, bench ROM resource, its
   allowlist entry: the Release ROM check is back to exactly the five demos). The bench runner and ROM moved to
   `Spikes/N64RDP/` so the Mac CLI bench still builds; `Tools/build_n64_bench_rom.py` now writes there.
@@ -38,7 +38,7 @@ Done and committed (5becb5b, 4c06a58, 97d7671, plus the docs commit):
 - **Privacy manifest:** SystemBootTime 35F9.1 added (frame pacing uses mach_absolute_time / CACurrentMediaTime).
 - **Store docs:** `docs/store/listing.md`, `review-notes.md`, `privacy-and-age-rating.md`, `compose.swift`
   (screenshot composer, exact sizes, Graphite/Ember).
-- **CoreKit tests:** 104 pass (Mac). The simulator Debug build had zero warnings (before the uncommitted edits below).
+- **CoreKit tests:** 104 pass (Mac). Simulator Debug build: zero warnings.
 - **Fable review (one pass):** must-fixes = placeholder email in the binary, repo must be public before Submit,
   DuoKit needs a licence + public repo, support/privacy URLs; all are in "Ready to submit" above. Shoulds applied:
   promo no longer says "Made for iPhone" (MFi wording) -> "Built around iPhone Duo", "GPL version 3 or later",
@@ -47,28 +47,37 @@ Done and committed (5becb5b, 4c06a58, 97d7671, plus the docs commit):
   keywords/captions); DS test-cart picture in a screenshot OK if not captioned as an included game; mupen64plus.ini
   low risk; 4+ defensible, accept 9+.
 
-**Right-side status bar (task 1): code audit only, NOT verified in a Duo simulator.** Every layout (shelf, all
-player poses, DS, N64 deck, table tray, book, landscape, editor, menus) is placed with absolute rects inside the
-`DuoStageReader` GeometryReader, which respects the safe area: `stage.bounds`/`canvas`/halves already exclude any
-trailing inset the system reports, and nothing in the app uses `ignoresSafeArea` for content (only the background
-surface and the sleep veil), `UIScreen` bounds or global coordinates. So nothing sits under a right-edge bar *if iOS
-reports it as a trailing safe-area inset*. Not checked: that the Duo sim/device actually reports it that way, and
-what happens with `.statusBarHidden(true)` in the player. Blocked because 3 simulators were already booted (rule: 2),
-the only booted Duo sim belongs to Relics (off-limits) and the disk stayed at 2.3-3.3 GB (build rule: 4 GB).
-"Games Duo" (7C3DCA79, iPhone-Duo type, iOS 27.1) is created but has never been booted.
+**Right-side status bar.** Simulator only; Gordon has no Duo, and nothing was checked on a real one.
+- **Fix (Gordon's rule, 14 Nov):** the player no longer hides the status bar on an iPhone Duo. It was
+  `.statusBarHidden(true)`, which leaves a black band on the right of a real Duo. The bar is now hidden only on
+  ordinary iPhones: `UIDevice` idiom is phone AND `!PlayerView.isDuo(stage)`, where isDuo means a real division region
+  that DuoKit isn't simulating, or the hinge reports closed. This is the same rule as Phones. DSPlayerView has no
+  `statusBarHidden` of its own. `persistentSystemOverlays(.hidden)` stays: it hides the home indicator only.
+- **Layout:** every layout is placed with absolute rects inside the `DuoStageReader` GeometryReader, which respects the
+  safe area. That covers the shelf, every player pose, DS, the N64 deck, the table tray, book, landscape, the editor and
+  the menus. No content uses `ignoresSafeArea` (only the background and the sleep veil do), `UIScreen` or global
+  coordinates. A trailing inset therefore shrinks the stage rather than covering controls.
+- **Checked** on the shared iPhone 17e with the new DEBUG `-fakeTrailingInset 54`, which draws a red band in the trailing
+  safe area. Everything stops at the band in table, flat, book and landscape: the N64 C buttons, the C stick, A/B/Z and
+  the R tab; the DS X/A, R and touch screen; the NES quick-slot tray; the shelf's "Add games" button.
+- **Not checked:** the real Duo simulator. 3 simulators were already booted against a limit of 2, the only booted Duo
+  sim belongs to Relics and is off-limits, and the disk was under 4 GB. I created "Games Duo" (7C3DCA79) but never
+  booted it. Not yet confirmed: that a Duo reports the right-edge bar as a trailing safe-area inset, including on the
+  outer display. When a slot frees up, run `-forceFold YES -logStage YES` on Games Duo; it logs the real insets.
 
-**Uncommitted, unbuilt (disk < 4 GB):** `App/App/DuoEmulatorApp.swift` DEBUG `-forceFold YES` (treat the Duo sim's
-real division region as folded: table/book at real size), `-logStage YES`, `-fakeTrailingInset 54` (red band added to
-the trailing safe area to prove nothing lands under it); `GameStore` DEBUG `-noTestCarts YES`; `PlayerView` keeps
-the micro sign in the bezel label (it showed "ΜCITY": `"µ".uppercased()` is Greek capital Mu). Build, then commit.
+**Screenshots** are composed by `docs/store/compose.swift` from iPhone 17e simulator captures of the bundled demos.
+The Duo shots come from DEBUG `-pose` captures cropped to the Duo's 1.42 canvas, not from the Duo simulator.
+- **Duo inner, 2007x2853:** `docs/store/shots/duo-inner/` holds 6 shots: table µCity, table Thwaite with the quick-slot
+  thumbnails, table DS (our own test cart; the caption doesn't claim a game), book Alex vs Bus, flat Libbet, and the
+  shelf in table pose.
+- **Duo outer, 1398x2034:** `docs/store/shots/duo-outer/` holds 3 shots: the shelf, "Close it to pause and save" (the
+  sleep veil), and Settings. A closed Duo shows the sleep veil over a game, so no outer shot shows live play.
+- **iPhone 6.9", 1320x2868:** `docs/store/shots/iphone69/` holds 5 shots: µCity, Thwaite, landscape Alex vs Bus, the
+  layout editor, and the shelf with only the 5 demos.
+- **Copies** of the Duo shots are in side-session-notes `duo-shots/games/inner` and `duo-shots/games/outer`.
 
-**Not done yet (all need a build or a simulator):** app unit tests, Release check, Duo screenshots (inner/outer),
-the final iPhone 6.9" set, TestFlight build 7. Provisional 6.9" shots (1320x2868, composed):
-`docs/store/shots/iphone69-provisional/` (Thwaite, landscape Alex vs Bus, layout editor); raw captures in
-`docs/store/shots/captures/`. Still needed for 6.9": µCity (after the label fix) and the shelf with `-noTestCarts`.
-No DS homebrew demo exists, so the DS table shot can only use our own DS test cart (Fable: OK, don't caption it as an
-included game). On the outer screen a closed Duo shows the "Sleeping" veil over a game (close-to-sleep design), so
-outer shots can be the shelf, the veil and settings, not live play.
+**Tests:** app unit tests 33 pass (Shared iPhone 17e). CoreKit 104 pass. Release device check: zero warnings (only the
+appintentsmetadataprocessor tool line), ROM allowlist passes with exactly the five demos.
 
 ---
 
