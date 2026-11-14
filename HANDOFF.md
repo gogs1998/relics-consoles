@@ -5,8 +5,9 @@ Nothing has been sent to App Review and the public repo does not exist yet. In o
 1. **Contact email (ship-blocker).** Send the address. It goes in ONE place: `AppLinks.contactEmail` in
    `App/Library/AboutView.swift` (now `CONTACT_EMAIL_TBD`). Build 7 carries the placeholder, so a new build (8) is
    needed after the change: Fable ruled a placeholder in the binary a 2.1 rejection. Also used on the support and privacy pages.
-2. **DuoKit licence (ship-blocker).** `gogs1998/iqlabs-duokit` is private with no LICENSE. In a GPLv3 app it is part of
-   the Corresponding Source: add an MIT (or GPLv3) LICENSE and make it public before submission.
+2. ~~DuoKit licence~~ **Done 2026-11-14:** Gordon keeps `iqlabs-duokit` private; DuoKit 0.1.2 is vendored at
+   `Packages/DuoKit` and licensed GPL-3.0-or-later as part of this app (he owns it, so his other apps are unaffected).
+   It goes public only inside the relics-games repo. Upstream changes: make them in iqlabs-duokit, copy back.
 3. **Create the public repo `gogs1998/relics-games`** (default branch `main`, the credits link `/tree/main/release-sources`),
    push this repo, tag the submitted build's commit (e.g. `v1.0-build8`), check it loads logged out. Before pushing,
    check the history for anything that must not be public (`Local.xcconfig` and `TestSuites/` are gitignored;

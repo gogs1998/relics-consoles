@@ -5,7 +5,7 @@ These third-party components are compiled into the app:
 
 | Component | Used for | Licence | Source | Modified? |
 |---|---|---|---|---|
-| DuoKit (from 0.1.2) | fold, hinge and pose handling for iPhone Duo | IQ Labs' own code; **must get a GPLv3-compatible licence (MIT or GPLv3) and a public repo before submission** (Corresponding Source) | https://github.com/gogs1998/iqlabs-duokit (private today) | n/a (ours) |
+| DuoKit 0.1.2 (vendored) | fold, hinge and pose handling for iPhone Duo | Gordon Shepherd's own code, licensed GPL-3.0-or-later as part of this app (`GPL-3.0.txt`); also used under other terms in the author's other apps | this repository, `Packages/DuoKit` | n/a (ours) |
 | mGBA (commit 662dada) | Game Boy Advance core, incl. its built-in (HLE) BIOS | MPL-2.0 (`mGBA-MPL-2.0.txt`) | https://github.com/mgba-emu/mgba | No (unmodified files in `Packages/CoreKit/Sources/MGBA/mgba`; any future change goes in `ThirdParty/mgba/patches/` and must be published) |
 | inih (inside mGBA) | mGBA's config parser | BSD-3-Clause (`inih-BSD-3-Clause.txt`) | via mGBA | No |
 | ares (commit 0b92893) | SNES and Mega Drive cores, nall, libco | ISC (`ares-ISC-and-bundled.txt`) | https://github.com/ares-emulator/ares | No (our stand-in headers live in `Sources/ARES/glue/shim`) |

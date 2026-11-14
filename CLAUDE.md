@@ -39,7 +39,7 @@ Fable review changes in §10) and `docs/research.md` (App Store 4.7, core licens
 ## Toolchain
 - Xcode 27.1, iOS 27.1 SDK, deployment iOS 26.0, Swift 6 strict concurrency, SwiftUI, Metal.
 - XcodeGen: `project.yml`. Never hand-edit `DuoEmulator.xcodeproj` (gitignored): `xcodegen generate`.
-- DuoKit `github.com/gogs1998/iqlabs-duokit` from 0.1.2 (don't fork; gaps go in `docs/DUOKIT-GAPS.md`).
+- DuoKit 0.1.2 vendored at `Packages/DuoKit` (GPL-3.0-or-later here; upstream private `gogs1998/iqlabs-duokit`). Don't edit the copy: change upstream, copy back; gaps go in `docs/DUOKIT-GAPS.md`.
 - CoreKit: local package `Packages/CoreKit` (targets CoreKit, NESCore, GBCore, MGBA + GBACore, ARES + AresCore,
   MELONDS + DSCore, MUPEN64 + N64Core;
   Swift cores build `-Ounchecked -enforce-exclusivity=unchecked`, C/C++ at -O2, even in Debug).
