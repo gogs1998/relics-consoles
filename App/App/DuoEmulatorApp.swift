@@ -37,7 +37,8 @@ struct RootView: View {
     @State private var openError: String?
 
     var body: some View {
-        DuoStageReader { stage in
+        DuoStageReader { realStage in
+            let stage = Self.debugForcedFold(realStage)
             ZStack {
                 if let player {
                     PlayerView(model: player, stage: stage) { quit() }
@@ -48,6 +49,17 @@ struct RootView: View {
                 }
             }
         }
+        #if DEBUG
+        // -fakeTrailingInset 54: add a band to the trailing safe area, like the iPhone Duo's right-edge status bar, to
+        // check that nothing (controls or game picture) is laid out under it in any pose.
+        .safeAreaPadding(.trailing, CGFloat(UserDefaults.standard.double(forKey: "fakeTrailingInset")))
+        .overlay(alignment: .trailing) {
+            let w = CGFloat(UserDefaults.standard.double(forKey: "fakeTrailingInset"))
+            if w > 0 {
+                Color.red.opacity(0.35).frame(width: w).ignoresSafeArea().allowsHitTesting(false)
+            }
+        }
+        #endif
         .background(BodySurface())
         .alert("Couldn't open the game", isPresented: Binding(get: { openError != nil }, set: { if !$0 { openError = nil } })) {
             Button("OK", role: .cancel) {}
@@ -70,6 +82,30 @@ struct RootView: View {
     private func quit() {
         player?.stop()
         withAnimation(.easeInOut(duration: 0.25)) { player = nil }
+    }
+
+    /// DEBUG `-forceFold YES`: on the iPhone Duo simulator (whose hinge can only be moved in DeviceHub) treat the real
+    /// division region as folded, so table (portrait) and book (landscape) layouts can be checked and screenshotted at
+    /// the real display size, with the system's real safe area. Release builds never change the stage.
+    private static func debugForcedFold(_ stage: DuoStage) -> DuoStage {
+        #if DEBUG
+        if debugFlag("logStage") {
+            NSLog("DuoStage bounds=%@ safeArea=(t %.1f l %.1f b %.1f r %.1f) fold=%@ active=%d closed=%d",
+                  NSCoder.string(for: stage.bounds), stage.safeArea.top, stage.safeArea.leading, stage.safeArea.bottom,
+                  stage.safeArea.trailing, NSCoder.string(for: stage.fold.frame), stage.fold.isActive ? 1 : 0,
+                  stage.isClosed ? 1 : 0)
+        }
+        guard debugFlag("forceFold"), !stage.fold.isActive, !stage.fold.isSimulated, !stage.fold.frame.isEmpty,
+              !stage.isClosed else { return stage }
+        var s = stage
+        s.fold.isActive = true
+        s.nearHalf = s.fold.nearHalf(in: s.canvas)
+        s.farHalf = s.fold.farHalf(in: s.canvas)
+        s.pose = s.fold.axis == .horizontal ? .table : .book
+        return s
+        #else
+        return stage
+        #endif
     }
 
     private static func debugFlag(_ name: String) -> Bool {

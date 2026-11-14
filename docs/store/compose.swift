@@ -21,8 +21,8 @@ let sets: [String: (w: Int, h: Int, shots: [S])] = [
     ]),
     "outer": (1398, 2034, [
         S(file: "1-outer-shelf", title: "Your games,\non your shelf", sub: "Add the games you own from Files", accent: 0xE86E59),
-        S(file: "2-outer-play", title: "Play on the\nouter screen too", sub: "A full controller under the game", accent: 0xFF6B3D),
-        S(file: "3-outer-sleep", title: "Close it to\npause and save", sub: "Open it to carry on where you were", accent: 0x8C80B3),
+        S(file: "2-outer-sleep", title: "Close it to\npause and save", sub: "Open it to carry on where you were", accent: 0x8C80B3),
+        S(file: "3-outer-settings", title: "Make it yours", sub: "Screen styles, volume, fast-forward speed", accent: 0xFF6B3D),
     ]),
     "iphone69": (1320, 2868, [
         S(file: "1-ucity", title: "Play the retro\ngames you own", sub: "Eight classic systems, one shelf", accent: 0xFF6B3D),

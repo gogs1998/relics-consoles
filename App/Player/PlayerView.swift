@@ -41,7 +41,10 @@ struct PlayerView: View {
             }
         }
         .frame(width: stage.bounds.width, height: stage.bounds.height)
-        .statusBarHidden(true)
+        // Never hide the status bar on an iPhone Duo (Gordon, 14 Nov 2026): there it sits on the right edge and
+        // hiding it leaves a black band, so the layout keeps clear of its safe-area inset instead. Hidden only on
+        // ordinary iPhones (no real fold, never closed). Same rule as Relics: Phones.
+        .statusBarHidden(UIDevice.current.userInterfaceIdiom == .phone && !Self.isDuo(stage))
         .persistentSystemOverlays(.hidden)
         .onChange(of: arrangement, initial: true) { _, new in
             switch new {
@@ -115,6 +118,12 @@ struct PlayerView: View {
                 .allowsHitTesting(false)
         }
         #endif
+    }
+
+    /// A real iPhone Duo: the OS reports a division region (not DuoKit's DEBUG simulation), or the hinge says closed
+    /// (the outer display has no division region).
+    static func isDuo(_ stage: DuoStage) -> Bool {
+        (!stage.fold.frame.isEmpty && !stage.fold.isSimulated) || stage.isClosed
     }
 
     /// The Duo is folded shut (DuoKit's hinge posture), or DEBUG `-lidCycle` says so.
@@ -448,7 +457,8 @@ struct ScreenBezel<Overlay: View>: View {
                         .shadow(color: Theme.ember.opacity(ledGlow ? 0.95 : 0.35), radius: ledGlow ? 6 : 2)
                         .opacity(ledGlow ? 1 : 0.7)
                         .accessibilityHidden(true)
-                    Text(model.game.title.uppercased())
+                    // Uppercase, but keep the micro sign: "µCity".uppercased() would turn it into a Greek capital Mu ("ΜCITY").
+                    Text(model.game.title.map { $0 == "µ" ? "µ" : $0.uppercased() }.joined())
                         .font(.rounded(.caption2, weight: .bold))
                         .tracking(1.4)
                         .foregroundStyle(Theme.inkDim)

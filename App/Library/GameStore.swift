@@ -61,7 +61,8 @@ final class GameStore {
         seedDemos()
         scanInbox()
         #if DEBUG
-        addBundledTestCarts()
+        // -noTestCarts YES: a shelf with only the shipped demos (store screenshots).
+        if !UserDefaults.standard.bool(forKey: "noTestCarts") { addBundledTestCarts() }
         #endif
     }
 
