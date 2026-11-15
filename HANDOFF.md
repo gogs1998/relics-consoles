@@ -3,7 +3,7 @@
 ## Ready to submit: what's left for Gordon (14 Nov 2026, v1.0 build 7)
 Nothing has been sent to App Review and the public repo does not exist yet. In order:
 1. **Contact email (ship-blocker).** Send the address. It goes in ONE place: `AppLinks.contactEmail` in
-   `App/Library/AboutView.swift` (now `CONTACT_EMAIL_TBD`). Build 7 carries the placeholder, so a new build (8) is
+   `App/Library/AboutView.swift` (now `CONTACT_EMAIL_TBD`). **Done: gordon@iqlabs.app, build 8 uploaded 2026-11-15.** Build 7 carried the placeholder, so a new build (8) was
    needed after the change: Fable ruled a placeholder in the binary a 2.1 rejection. Also used on the support and privacy pages.
 2. ~~DuoKit licence~~ **Done 2026-11-14:** Gordon keeps `iqlabs-duokit` private; DuoKit 0.1.2 is vendored at
    `Packages/DuoKit` and licensed GPL-3.0-or-later as part of this app (he owns it, so his other apps are unaffected).
