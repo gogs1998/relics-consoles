@@ -1,10 +1,10 @@
 import SwiftUI
 
-/// Where the app's source lives and how to reach us. The contact address is a placeholder until Gordon supplies it:
-/// change `contactEmail` (the only place it appears) before submitting (HANDOFF.md, "Ready to submit").
+/// Where the app's source lives and how to reach us.
+/// `contactEmail` is the only place the address appears.
 enum AppLinks {
     static let sourceCode = "https://github.com/gogs1998/relics-games"
-    static let contactEmail = "CONTACT_EMAIL_TBD"
+    static let contactEmail = "gordon@iqlabs.app"
 }
 
 /// About: what the app is (and isn't), the non-affiliation line, and the licences.
