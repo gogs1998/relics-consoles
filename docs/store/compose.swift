@@ -26,9 +26,9 @@ let sets: [String: (w: Int, h: Int, shots: [S])] = [
     ]),
     "iphone69": (1320, 2868, [
         S(file: "1-ucity", title: "Play the retro\ngames you own", sub: "Eight classic systems, one shelf", accent: 0xFF6B3D),
-        S(file: "2-thwaite", title: "Save anywhere,\nrewind anytime", sub: "Picture save states, rewind and fast-forward", accent: 0xE0A33B),
-        S(file: "3-landscape", title: "Turn it sideways", sub: "Controls beside the picture", accent: 0x4D5C7A),
-        S(file: "4-editor", title: "Make the\ncontroller yours", sub: "Move, resize, fade or hide any button", accent: 0x5C7A99),
+        S(file: "2-editor", title: "Make the\ncontroller yours", sub: "Move, resize, fade or hide any button", accent: 0x5C7A99),
+        S(file: "3-thwaite", title: "Save anywhere,\nrewind anytime", sub: "Picture save states, rewind and fast-forward", accent: 0xE0A33B),
+        S(file: "4-landscape", title: "Turn it sideways", sub: "Controls beside the picture", accent: 0x4D5C7A),
         S(file: "5-shelf", title: "Your games,\non your shelf", sub: "Add the games you own from Files", accent: 0xE86E59),
     ]),
 ]
