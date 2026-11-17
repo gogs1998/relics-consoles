@@ -7,8 +7,7 @@ secondary: Entertainment. Bundle id com.iqlabs.duoemulator. Home-screen name "Re
 Rules this copy follows: no console brand in the app name or subtitle, no competitor names, no game titles, systems named
 in plain text only, no logos or trade dress anywhere in the screenshots.
 
-> **N64 line:** the first release includes Nintendo 64 only if Gordon's own N64 games pass on TestFlight. If N64 is
-> dropped, delete "Nintendo 64" from the system list and the "three-dimensional" sentence below.
+> **N64:** confirmed by Gordon on his own N64 games (build 9, 2026-11-17), so it stays in.
 
 ## Name (30)
 Relics: Games
@@ -27,6 +26,11 @@ Relics: Games plays the classic game files you already own, on iPhone, iPad and 
 Files app and they appear on your shelf, ready to play. A few free homebrew games are already on the shelf, shared by
 their authors under free licences, so you can try it straight away.
 
+BUILD YOUR OWN CONTROLLER
+Make the on-screen controller yours. Drag any button where your thumbs want it, make it bigger or smaller, fade it or
+hide it. Every system, every game and every way you hold the phone keeps its own layout, so a racing game and a
+platformer can each feel just right.
+
 SYSTEMS
 NES, SNES, Game Boy, Game Boy Color, Game Boy Advance, Mega Drive, Nintendo DS and Nintendo 64.
 
@@ -44,7 +48,6 @@ PLAY YOUR WAY
 • Save states with pictures, plus an automatic save when you leave a game
 • Rewind a few seconds, or fast-forward at 2x to 8x
 • Screen styles: sharp pixels, pixel-perfect scaling, scanlines and a handheld LCD look
-• A touch controller you can rearrange: drag, resize, fade or hide any button, per system, per game and per pose
 • A six-button layout for the systems that use one
 • Analog stick and camera buttons for three-dimensional games, with an optional camera stick
 • Bluetooth game controllers and keyboards, with remapping, hotkeys and a second player
