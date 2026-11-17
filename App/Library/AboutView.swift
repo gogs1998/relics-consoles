@@ -2,8 +2,8 @@ import SwiftUI
 
 /// Where the app's source lives and how to reach us.
 /// `contactEmail` is the only place the address appears.
-/// The source is given on request (the repo is private for now).
 enum AppLinks {
+    static let sourceCode = "https://github.com/gogs1998/relics-consoles"
     static let contactEmail = "gordon@iqlabs.app"
 }
 
@@ -63,7 +63,10 @@ struct AboutView: View {
                     Text("The NES and Game Boy / Game Boy Color cores, the app, its controller and art, and DuoKit (its iPhone Duo fold and hinge layer) are original IQ Labs work.")
                     Text("Relics: Consoles © 2026 IQ Labs. It is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License, version 3 or (at your option) any later version. It comes with NO WARRANTY. See GNU GPL 3.0 below.")
                         .foregroundStyle(.secondary)
-                    Text("The complete source code is available on request, free of charge, from the contact address below.")
+                    LabeledContent("Source code") {
+                        Text(AppLinks.sourceCode).textSelection(.enabled)
+                    }
+                    .accessibilityElement(children: .combine)
                     LabeledContent("Contact") {
                         Text(AppLinks.contactEmail).textSelection(.enabled)
                     }
