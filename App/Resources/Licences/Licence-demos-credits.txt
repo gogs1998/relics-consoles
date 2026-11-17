@@ -166,10 +166,9 @@ https://creativecommons.org/licenses/by-sa/4.0/legalcode.
 Getting the source code
 -----------------------
 The complete source code of each GPL-licensed demo, for the exact version
-included, is available at no charge from the addresses above, and the exact
-source archives of µCity 1.3, Thwaite 0.03 and Alex vs Bus pre3 are mirrored
-alongside the source of Relics: Games at:
-https://github.com/gogs1998/relics-games/tree/main/release-sources
+included, is available at no charge from the addresses above. We also keep
+the exact source archives of µCity 1.3, Thwaite 0.03 and Alex vs Bus pre3,
+and will send them free of charge on request to gordon@iqlabs.app.
 
 The seeded demo files are in the app's Games folder, which you can open in
 the Files app.
