@@ -1,3 +1,8 @@
+**Submitted? (2026-11-17)** Gordon said "submit" for build 9; the DUO coordinator does the submission in ASC.
+**First update (1.1) list, agreed with Gordon:** two-phone multiplayer; DS GPU renderer; original controller skins (own colours and
+materials, never console trade dress; skin import later); tidy the controller-connected panel (empty save slots read as broken, hotkeys
+behind "?"); portrait screen bezel should hug the picture (N64 wastes ~1 cm of glass, PlayerView.portraitLayout screenH).
+
 **Build 9 (2026-11-17), the submit candidate, replacing 8:** Gordon chose to keep `gogs1998/relics-games` private "until someone asks".
 Build 9 removes the dead GitHub links (About, demo credits) for "source available on request from gordon@iqlabs.app"; the store
 listing and review notes were changed to match. If anyone asks for source: make the repo public (author email rewritten first).
