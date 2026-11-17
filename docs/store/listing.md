@@ -60,7 +60,7 @@ folder in Files.
 
 OPEN SOURCE
 Relics: Consoles is free software under the GNU General Public License, version 3 or later. The source code is at
-github.com/gogs1998/relics-games.
+github.com/gogs1998/relics-consoles.
 
 Relics: Consoles doesn't include any games other than the free homebrew demos, and no console system software. Use it
 only with games you own. Relics: Consoles is not affiliated with, endorsed or sponsored by Nintendo or Sega. Console
