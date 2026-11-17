@@ -22,7 +22,8 @@ your thumbs. Close it to pause and save.
 (162 characters.)
 
 ## Description (4000)
-Relics: Games plays the classic game files you already own, on iPhone, iPad and iPhone Duo. Add your games from the
+Relics: Games is a retro game player made for iPhone Duo's two screens from the ground up, and it plays just as well on
+iPhone and iPad. It plays the classic game files you already own. Add your games from the
 Files app and they appear on your shelf, ready to play. A few free homebrew games are already on the shelf, shared by
 their authors under free licences, so you can try it straight away.
 
