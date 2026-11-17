@@ -1,3 +1,7 @@
+**Build 9 (2026-11-17), the submit candidate, replacing 8:** Gordon chose to keep `gogs1998/relics-games` private "until someone asks".
+Build 9 removes the dead GitHub links (About, demo credits) for "source available on request from gordon@iqlabs.app"; the store
+listing and review notes were changed to match. If anyone asks for source: make the repo public (author email rewritten first).
+
 # HANDOFF: Relics: Games (repo "duo-emulator", ASC record "Foldback")
 
 ## Ready to submit: what's left for Gordon (14 Nov 2026, v1.0 build 7)
