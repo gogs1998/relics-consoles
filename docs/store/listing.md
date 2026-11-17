@@ -59,8 +59,8 @@ No accounts, no ads, no tracking and no internet connection. Your games and save
 folder in Files.
 
 OPEN SOURCE
-Relics: Games is free software under the GNU General Public License, version 3 or later. The complete source code is
-available free of charge on request.
+Relics: Games is free software under the GNU General Public License, version 3 or later. The source code is at
+github.com/gogs1998/relics-games.
 
 Relics: Games doesn't include any games other than the free homebrew demos, and no console system software. Use it
 only with games you own. Relics: Games is not affiliated with, endorsed or sponsored by Nintendo or Sega. Console
