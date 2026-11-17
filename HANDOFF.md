@@ -1,4 +1,7 @@
 **Submitted? (2026-11-17)** Gordon said "submit" for build 9; the DUO coordinator does the submission in ASC.
+**Fable pre-submit (2026-11-17): "source on request" fails GPLv3 §6(d) for App Store downloads; fix = public repo before SALE (Gordon deciding:
+manual release + public on release day, or drop DS/N64). Public copy is pre-built, not pushed: scratchpad public-copy, emails rewritten to
+gordon@iqlabs.app in authors AND CLAUDE.md history, tag v1.0-build9. Also: Libbet is GBC on the shelf but "Game Boy" in review notes; align.**
 **First update (1.1) list, agreed with Gordon:** two-phone multiplayer; DS GPU renderer; original controller skins (own colours and
 materials, never console trade dress; skin import later); tidy the controller-connected panel (empty save slots read as broken, hotkeys
 behind "?"); portrait screen bezel should hug the picture (N64 wastes ~1 cm of glass, PlayerView.portraitLayout screenH).
