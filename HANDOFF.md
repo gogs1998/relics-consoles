@@ -1,3 +1,9 @@
+**PUBLIC since 2026-11-17 (Gordon: "public"): https://github.com/gogs1998/relics-games**, GitHub detects GPL-3.0, tag v1.0-build9 = the 1.0 binary.
+To publish later commits: clone main to a scratch dir, drop origin, run `git filter-branch` with an env-filter setting author and committer
+email to gordon@iqlabs.app, plus a tree-filter replacing Gordon's personal address in CLAUDE.md. Delete refs/original, add the GitHub
+origin and check `merge-base --is-ancestor origin/main main`. The rewrite is deterministic, so it fast-forwards. Push main (never force).
+Never put the personal address in a tracked file other than CLAUDE.md.
+
 **Submitted? (2026-11-17)** Gordon said "submit" for build 9; the DUO coordinator does the submission in ASC.
 **Fable pre-submit (2026-11-17): "source on request" fails GPLv3 §6(d) for App Store downloads; fix = public repo before SALE (Gordon deciding:
 manual release + public on release day, or drop DS/N64). Public copy is pre-built, not pushed: scratchpad public-copy, emails rewritten to
