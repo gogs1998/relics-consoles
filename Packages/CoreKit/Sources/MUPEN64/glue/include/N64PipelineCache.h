@@ -1,4 +1,4 @@
-// The N64 renderer's persistent Vulkan pipeline cache file (Relics: Games, GPLv3).
+// The N64 renderer's persistent Vulkan pipeline cache file (Relics: Consoles, GPLv3).
 //
 // paraLLEl-RDP builds its compute pipelines on first use (SPIR-V -> MSL -> Metal through MoltenVK). The VkPipelineCache
 // is saved to Application Support and reloaded at the next start, so those builds happen once per device rather than

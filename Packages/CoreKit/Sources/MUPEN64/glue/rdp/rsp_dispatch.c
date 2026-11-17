@@ -1,5 +1,5 @@
-// RSP dispatcher (Relics: Games, GPLv3). Graphics tasks (OSTask type 1 at DMEM 0xFC0) run on cxd4's interpreter (LLE),
-// so the RDP gets the real command stream; audio and everything else stay on rsp-hle. Part of Relics: Games (GPLv3).
+// RSP dispatcher (Relics: Consoles, GPLv3). Graphics tasks (OSTask type 1 at DMEM 0xFC0) run on cxd4's interpreter (LLE),
+// so the RDP gets the real command stream; audio and everything else stay on rsp-hle. Part of Relics: Consoles (GPLv3).
 #define M64P_PLUGIN_PROTOTYPES 1
 #include <string.h>
 

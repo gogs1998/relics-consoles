@@ -2,7 +2,7 @@
 // etc.) to n64volk_* so they don't collide with the real vk* functions exported by the statically linked MoltenVK
 // on iOS. Included first by every build unit in glue/rdp/units and by rdp_glue.cpp. Regenerate with:
 //   grep -oE '^extern PFN_vk[A-Za-z0-9_]+ vk[A-Za-z0-9_]+;' volk.h | awk '{print $3}' | tr -d ';' | sort -u
-// Part of Relics: Games (GPLv3).
+// Part of Relics: Consoles (GPLv3).
 #pragma once
 #define vkAcquireDrmDisplayEXT n64volk_vkAcquireDrmDisplayEXT
 #define vkAcquireFullScreenExclusiveModeEXT n64volk_vkAcquireFullScreenExclusiveModeEXT

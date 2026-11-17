@@ -1,6 +1,6 @@
-# Source code of the GPL demos bundled with Relics: Games
+# Source code of the GPL demos bundled with Relics: Consoles
 
-Relics: Games ships three GPL-3.0-or-later homebrew games as unmodified game files on the player's shelf. GPLv3 §6
+Relics: Consoles ships three GPL-3.0-or-later homebrew games as unmodified game files on the player's shelf. GPLv3 §6
 requires the Corresponding Source to be available from the same place, so the exact upstream source archives for the
 versions we ship are kept here, unmodified. This folder is not part of the app bundle.
 

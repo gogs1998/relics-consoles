@@ -1,4 +1,4 @@
-# Privacy and age rating: Relics: Games 1.0
+# Privacy and age rating: Relics: Consoles 1.0
 
 ## App Privacy (App Store Connect › App Privacy)
 **Data Not Collected.** Answer "No, we do not collect data from this app."
@@ -11,7 +11,7 @@ Why that is true:
   APIs declared: UserDefaults (CA92.1), file timestamps (C617.1) and system boot time (35F9.1, frame pacing).
 
 Privacy policy URL: ASC requires one even for "Data Not Collected". Use the Relics privacy page pattern of the other
-Relics apps ("Relics: Games collects no data. It has no accounts, ads or analytics and never connects to the
+Relics apps ("Relics: Consoles collects no data. It has no accounts, ads or analytics and never connects to the
 internet."), plus the contact email once Gordon supplies it.
 
 ## Age rating (suggested: 4+)

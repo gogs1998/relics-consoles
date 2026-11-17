@@ -1,4 +1,4 @@
-// Store screenshot composer for Relics: Games (after the Relics compose scripts in DuoStudio, rewritten here).
+// Store screenshot composer for Relics: Consoles (after the Relics compose scripts in DuoStudio, rewritten here).
 // Usage: swift docs/store/compose.swift <captures-dir> <out-dir> <inner|outer|iphone69>
 // Reads <captures-dir>/<file>.png (real simulator captures, untouched) and writes <out-dir>/<file>.png at the exact
 // App Store size: Duo inner 2007x2853, Duo outer 1398x2034, iPhone 6.9" 1320x2868. Colours: our Graphite and Ember.

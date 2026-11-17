@@ -1,4 +1,4 @@
-// The N64 renderer's pipeline cache file format (Relics: Games, GPLv3). See N64PipelineCache.h.
+// The N64 renderer's pipeline cache file format (Relics: Consoles, GPLv3). See N64PipelineCache.h.
 //
 // Layout (little-endian):
 //   0 "RLPC"  4 format (1)  8 vendorID  12 deviceID  16 driverVersion  20 uuid[16]  36 reserved (0)

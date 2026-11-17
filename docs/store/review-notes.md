@@ -1,11 +1,11 @@
-# App Review notes: Relics: Games 1.0
+# App Review notes: Relics: Consoles 1.0
 
 Paste the block below into App Store Connect › App Review Information › Notes. No sign-in is needed (the app has no
 accounts), so leave the demo account fields empty.
 
 ---
 
-Relics: Games is a game emulator (guideline 4.7) for game files the user already owns. It plays NES, SNES, Game Boy,
+Relics: Consoles is a game emulator (guideline 4.7) for game files the user already owns. It plays NES, SNES, Game Boy,
 Game Boy Color, Game Boy Advance, Mega Drive, Nintendo DS and Nintendo 64 game files.
 
 How games get in: the user imports their own files through the Files picker ("Add games" on the shelf), "Open in" from

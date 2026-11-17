@@ -425,7 +425,7 @@ struct LayoutEditorPanel: View {
             if let data = try? Data(contentsOf: url), let b = try? LayoutDocument.decode(data) {
                 editor.importBundle(b)
             } else {
-                editor.message = "That file isn't a Relics Games layout"
+                editor.message = "That file isn't a Relics Consoles layout"
             }
         }
     }

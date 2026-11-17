@@ -1,6 +1,6 @@
 // N64 speed test: runs our own bench ROM through paraLLEl-RDP + cxd4 and reports fps with a CPU/RSP/RDP/GPU
 // breakdown (docs/n64-rdp-spike.md). Used by the hidden speed-test screen and Spikes/N64RDP's Mac CLI.
-// Part of Relics: Games (GPLv3).
+// Part of Relics: Consoles (GPLv3).
 #ifndef N64BENCH_H
 #define N64BENCH_H
 #include <stdbool.h>

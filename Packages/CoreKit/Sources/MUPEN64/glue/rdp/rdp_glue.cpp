@@ -1,5 +1,5 @@
 // paraLLEl-RDP (MIT, vendored unmodified in Sources/MUPEN64/parallel-rdp) behind our mupen64plus glue, on MoltenVK.
-// Part of Relics: Games (GPLv3). Measured in docs/n64-rdp-spike.md. The command-stream handling follows the protocol every
+// Part of Relics: Consoles (GPLv3). Measured in docs/n64-rdp-spike.md. The command-stream handling follows the protocol every
 // paraLLEl-RDP integration uses (DPC_CURRENT..DPC_END from RDRAM or, with the XBUS bit, from DMEM; commands may
 // straddle two ProcessRDPList calls; SyncFull raises the DP interrupt), written here from the RDP documentation.
 #include "volk_rename.h"   // before any Vulkan header: volk's globals must not clash with MoltenVK

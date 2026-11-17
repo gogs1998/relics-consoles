@@ -1,4 +1,4 @@
-// Our paraLLEl-RDP + cxd4 layer under the mupen64plus glue. Part of Relics: Games (GPLv3).
+// Our paraLLEl-RDP + cxd4 layer under the mupen64plus glue. Part of Relics: Consoles (GPLv3).
 //
 // Connects the glue to paraLLEl-RDP (MIT, Vulkan compute, on MoltenVK) for the RDP and to cxd4's RSP interpreter
 // (CC0) for graphics tasks; audio and other tasks still go to rsp-hle. Without Vulkan (simulator, Mac tests)

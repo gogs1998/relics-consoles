@@ -1,13 +1,13 @@
-Free homebrew demos included with Relics: Games
+Free homebrew demos included with Relics: Consoles
 ================================================
 
-Relics: Games includes five small games written by independent authors and
+Relics: Consoles includes five small games written by independent authors and
 released under free licences. Each is an unmodified copy of the author's own
 build, stored as a separate game file and run by the emulator like any other
 game file you add. They are not part of the app's program code. You can delete
 them from your shelf; they won't come back.
 
-The authors did not make, endorse or sponsor Relics: Games.
+The authors did not make, endorse or sponsor Relics: Consoles.
 
 
 µCity 1.3 (ucity.gbc) - Game Boy Color

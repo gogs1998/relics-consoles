@@ -1,4 +1,4 @@
-// N64 RDP spike: Mac command-line bench. Part of Relics: Games (GPLv3).
+// N64 RDP spike: Mac command-line bench. Part of Relics: Consoles (GPLv3).
 // Usage: n64rdp_bench <rom.z64> [--async] [--ppm out.ppm]
 #include <stdio.h>
 #include <stdlib.h>

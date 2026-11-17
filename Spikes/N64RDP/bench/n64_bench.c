@@ -1,4 +1,4 @@
-// N64 speed test runner for the Mac CLI spike (moved out of the app for release). Part of Relics: Games
+// N64 speed test runner for the Mac CLI spike (moved out of the app for release). Part of Relics: Consoles
 // (GPLv3). See N64BenchGlue.h.
 #include "N64BenchGlue.h"
 

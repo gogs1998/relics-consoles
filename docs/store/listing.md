@@ -1,8 +1,8 @@
-# App Store listing: Relics: Games (v1.0)
+# App Store listing: Relics: Consoles (v1.0)
 
-Draft for Gordon's approval. ASC app id 6833521756 (record created as "Foldback"; store name now "Relics: Games").
-Price: £3.99 (tier matching the other Relics apps). Primary category: Games (subcategory: Arcade or Casual),
-secondary: Entertainment. Bundle id com.iqlabs.duoemulator. Home-screen name "Relics Games".
+Draft for Gordon's approval. ASC app id 6833521756 (record created as "Foldback"; store name now "Relics: Consoles").
+Price: £3.99 (tier matching the other Relics apps). Primary category: Games (subcategory: Action),
+secondary: Entertainment. Bundle id com.iqlabs.duoemulator. Home-screen name "Relics Consoles".
 
 Rules this copy follows: no console brand in the app name or subtitle, no competitor names, no game titles, systems named
 in plain text only, no logos or trade dress anywhere in the screenshots.
@@ -10,7 +10,7 @@ in plain text only, no logos or trade dress anywhere in the screenshots.
 > **N64:** confirmed by Gordon on his own N64 games (build 9, 2026-11-17), so it stays in.
 
 ## Name (30)
-Relics: Games
+Relics: Consoles
 
 ## Subtitle (30)
 Play the retro games you own
@@ -22,7 +22,7 @@ your thumbs. Close it to pause and save.
 (162 characters.)
 
 ## Description (4000)
-Relics: Games is a retro game player made for iPhone Duo's two screens from the ground up, and it plays just as well on
+Relics: Consoles is a retro game player made for iPhone Duo's two screens from the ground up, and it plays just as well on
 iPhone and iPad. It plays the classic game files you already own. Add your games from the
 Files app and they appear on your shelf, ready to play. A few free homebrew games are already on the shelf, shared by
 their authors under free licences, so you can try it straight away.
@@ -59,11 +59,11 @@ No accounts, no ads, no tracking and no internet connection. Your games and save
 folder in Files.
 
 OPEN SOURCE
-Relics: Games is free software under the GNU General Public License, version 3 or later. The source code is at
+Relics: Consoles is free software under the GNU General Public License, version 3 or later. The source code is at
 github.com/gogs1998/relics-games.
 
-Relics: Games doesn't include any games other than the free homebrew demos, and no console system software. Use it
-only with games you own. Relics: Games is not affiliated with, endorsed or sponsored by Nintendo or Sega. Console
+Relics: Consoles doesn't include any games other than the free homebrew demos, and no console system software. Use it
+only with games you own. Relics: Consoles is not affiliated with, endorsed or sponsored by Nintendo or Sega. Console
 names are trademarks of their owners and are used only to say which game files the app can open.
 
 ## Keywords (100)

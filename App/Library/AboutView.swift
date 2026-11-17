@@ -55,13 +55,13 @@ struct AboutView: View {
         NavigationStack {
             List {
                 Section {
-                    Text("Relics: Games plays NES, SNES, Game Boy, Game Boy Color, Game Boy Advance, Mega Drive, Nintendo DS and Nintendo 64 games you own. It includes a few free homebrew demos, shared by their authors under free licences, and no Nintendo or Sega system software. It never downloads games.")
-                    Text("Relics: Games is not affiliated with, endorsed or sponsored by Nintendo or Sega. Console names are trademarks of their owners and are used only to say which game files the app can open.")
+                    Text("Relics: Consoles plays NES, SNES, Game Boy, Game Boy Color, Game Boy Advance, Mega Drive, Nintendo DS and Nintendo 64 games you own. It includes a few free homebrew demos, shared by their authors under free licences, and no Nintendo or Sega system software. It never downloads games.")
+                    Text("Relics: Consoles is not affiliated with, endorsed or sponsored by Nintendo or Sega. Console names are trademarks of their owners and are used only to say which game files the app can open.")
                         .foregroundStyle(.secondary)
                 }
                 Section("Our own work") {
                     Text("The NES and Game Boy / Game Boy Color cores, the app, its controller and art, and DuoKit (its iPhone Duo fold and hinge layer) are original IQ Labs work.")
-                    Text("Relics: Games © 2026 IQ Labs. It is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License, version 3 or (at your option) any later version. It comes with NO WARRANTY. See GNU GPL 3.0 below.")
+                    Text("Relics: Consoles © 2026 IQ Labs. It is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License, version 3 or (at your option) any later version. It comes with NO WARRANTY. See GNU GPL 3.0 below.")
                         .foregroundStyle(.secondary)
                     Text("The complete source code is available on request, free of charge, from the contact address below.")
                     LabeledContent("Contact") {

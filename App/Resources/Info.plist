@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Relics Games</string>
+	<string>Relics Consoles</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -70,7 +70,7 @@
 			<key>UTTypeIdentifier</key>
 			<string>com.iqlabs.duoemulator.layout</string>
 			<key>UTTypeDescription</key>
-			<string>Relics Games controller layout</string>
+			<string>Relics Consoles controller layout</string>
 			<key>UTTypeConformsTo</key>
 			<array><string>public.json</string></array>
 			<key>UTTypeTagSpecification</key>

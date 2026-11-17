@@ -1,6 +1,6 @@
 # Third-party licences
 
-Relics: Games' NES and Game Boy / Game Boy Color cores, the app, its art and its test ROMs are our own.
+Relics: Consoles' NES and Game Boy / Game Boy Color cores, the app, its art and its test ROMs are our own.
 These third-party components are compiled into the app:
 
 | Component | Used for | Licence | Source | Modified? |

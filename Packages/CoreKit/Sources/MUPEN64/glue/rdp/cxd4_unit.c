@@ -1,5 +1,5 @@
 // Build unit for cxd4's RSP interpreter (mupen64plus-rsp-cxd4, CC0), vendored unmodified in
-// Sources/MUPEN64/rsp-cxd4 and compiled through its own unity file lto.c. Part of Relics: Games (GPLv3).
+// Sources/MUPEN64/rsp-cxd4 and compiled through its own unity file lto.c. Part of Relics: Consoles (GPLv3).
 //
 // - The plugin entry points and cxd4's core-function pointers get a cxd4_ prefix (statically linked plugins share
 //   one namespace with mupen64plus-core and rsp-hle).
