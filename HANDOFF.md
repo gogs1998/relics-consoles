@@ -1,3 +1,8 @@
+**RENAMED 2026-11-17: Relics: Consoles** (home screen "Relics Consoles"); the "Relics: Games" name goes to the mini-games app. Icon C (ember
+clamshell, docs/icon). Repo renamed to github.com/gogs1998/relics-consoles (old URL redirects); pages at iqlabs-apps consoles/ (games/
+redirects for now; mini-games may reclaim games/ later). Build 10 = rename + icon + source link back in About + iPad landscape 74%;
+NOT BUILT yet (disk < 4 GB). iPad 13" shots in docs/store/shots/ipad13. iPad sim DCDA709F is shut down; delete when done.
+
 **PUBLIC since 2026-11-17 (Gordon: "public"): https://github.com/gogs1998/relics-games**, GitHub detects GPL-3.0, tag v1.0-build9 = the 1.0 binary.
 To publish later commits: clone main to a scratch dir, drop origin, run `git filter-branch` with an env-filter setting author and committer
 email to gordon@iqlabs.app, plus a tree-filter replacing Gordon's personal address in CLAUDE.md. Delete refs/original, add the GitHub
