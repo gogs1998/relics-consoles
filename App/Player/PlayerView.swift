@@ -235,9 +235,11 @@ struct PlayerView: View {
     private var landscapeLayout: some View {
         let c = stage.canvas
         // With a controller: the whole height, pixel-perfect when "Auto" (integer scaling).
+        // Touch: the game gets 62% of the width on phones; on iPad-size canvases the side controls
+        // need less of the width, so the game gets 74%.
         let physical = model.physicalMode
         let mode: ScreenMode = physical && model.screenMode == .auto ? .integer : model.screenMode
-        let box = physical ? CGSize(width: c.width - 16, height: c.height - 8) : CGSize(width: c.width * 0.62, height: c.height - 16)
+        let box = physical ? CGSize(width: c.width - 16, height: c.height - 8) : CGSize(width: c.width * (c.width >= 1000 ? 0.74 : 0.62), height: c.height - 16)
         let fit = ScreenFit.rect(video: model.videoSize, in: box, mode: mode, displayScale: displayScale)
         let game = CGRect(x: c.midX - fit.size.width / 2, y: c.midY - fit.size.height / 2,
                           width: fit.size.width, height: fit.size.height)

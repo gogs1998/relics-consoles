@@ -1,7 +1,7 @@
 // Store screenshot composer for Relics: Consoles (after the Relics compose scripts in DuoStudio, rewritten here).
-// Usage: swift docs/store/compose.swift <captures-dir> <out-dir> <inner|outer|iphone69>
+// Usage: swift docs/store/compose.swift <captures-dir> <out-dir> <inner|outer|iphone69|ipad13>
 // Reads <captures-dir>/<file>.png (real simulator captures, untouched) and writes <out-dir>/<file>.png at the exact
-// App Store size: Duo inner 2007x2853, Duo outer 1398x2034, iPhone 6.9" 1320x2868. Colours: our Graphite and Ember.
+// App Store size: Duo inner 2007x2853, Duo outer 1398x2034, iPhone 6.9" 1320x2868, iPad 13" 2064x2752. Colours: our Graphite and Ember.
 import AppKit
 
 let args = CommandLine.arguments
@@ -24,6 +24,12 @@ let sets: [String: (w: Int, h: Int, shots: [S])] = [
         S(file: "2-outer-sleep", title: "Close it to\npause and save", sub: "Open it to carry on where you were", accent: 0x8C80B3),
         S(file: "3-outer-settings", title: "Make it yours", sub: "Screen styles, volume, fast-forward speed", accent: 0xFF6B3D),
     ]),
+    "ipad13": (2064, 2752, [
+        S(file: "1-ucity", title: "Play the retro\ngames you own", sub: "Eight classic systems, one shelf", accent: 0xFF6B3D),
+        S(file: "2-editor", title: "Make the\ncontroller yours", sub: "Move, resize, fade or hide any button", accent: 0x5C7A99),
+        S(file: "3-thwaite", title: "A big screen\nfor small pixels", sub: "Sharp pixels, scanlines or a handheld LCD look", accent: 0xE0A33B),
+        S(file: "4-shelf", title: "Your games,\non your shelf", sub: "Add the games you own from Files", accent: 0xE86E59),
+    ]),
     "iphone69": (1320, 2868, [
         S(file: "1-ucity", title: "Play the retro\ngames you own", sub: "Eight classic systems, one shelf", accent: 0xFF6B3D),
         S(file: "2-editor", title: "Make the\ncontroller yours", sub: "Move, resize, fade or hide any button", accent: 0x5C7A99),
@@ -32,7 +38,7 @@ let sets: [String: (w: Int, h: Int, shots: [S])] = [
         S(file: "5-shelf", title: "Your games,\non your shelf", sub: "Add the games you own from Files", accent: 0xE86E59),
     ]),
 ]
-guard let spec = sets[set] else { fatalError("set must be inner, outer or iphone69") }
+guard let spec = sets[set] else { fatalError("set must be inner, outer, iphone69 or ipad13") }
 let W = spec.w, H = spec.h
 let k = CGFloat(W) / 2007   // scale type and margins from the inner design
 func font(_ size: CGFloat, _ weight: NSFont.Weight) -> NSFont {
