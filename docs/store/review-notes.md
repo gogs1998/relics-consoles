@@ -26,7 +26,7 @@ under an open licence, and credited in the app under About › Free demos:
 No network: no accounts, ads, analytics, tracking, in-app purchases or web views. Privacy: no data collected.
 
 Open source: the app is licensed under the GNU GPL version 3 or later (it uses GPL emulator cores). Source code:
-https://github.com/gogs1998/relics-consoles (tag v1.0-build9 is this build). Every component's licence is listed in the app under About.
+https://github.com/gogs1998/relics-consoles (tag v1.0-build10 is this build). Every component's licence is listed in the app under About.
 
 How to test:
 1. Open the app. The shelf shows the five free demos.
