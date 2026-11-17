@@ -1,6 +1,6 @@
-**RENAMED 2026-11-17: Relics: Consoles** (home screen "Relics Consoles"); the "Relics: Games" name goes to the mini-games app. Icon C (ember
+**RENAMED 2026-11-17: Relics: Consoles** (home screen "Relics Consoles"); no app is "Relics: Games" for now; the mini-games stay "Relics: Arcade" (Gordon). Icon C (ember
 clamshell, docs/icon). Repo renamed to github.com/gogs1998/relics-consoles (old URL redirects); pages at iqlabs-apps consoles/ (games/
-redirects for now; mini-games may reclaim games/ later). Build 10 = rename + icon + source link back in About + iPad landscape 74%;
+redirects for now; a future "Relics: Games" may reclaim games/ later). Build 10 = rename + icon + source link back in About + iPad landscape 74%;
 NOT BUILT yet (disk < 4 GB). iPad 13" shots in docs/store/shots/ipad13. iPad sim DCDA709F is shut down; delete when done.
 
 **PUBLIC since 2026-11-17 (Gordon: "public"): https://github.com/gogs1998/relics-games**, GitHub detects GPL-3.0, tag v1.0-build9 = the 1.0 binary.
