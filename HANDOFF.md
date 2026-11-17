@@ -67,7 +67,7 @@ Commits 5becb5b, 4c06a58, 97d7671, eed8236, 7e8a6dd (+ the build-7 HANDOFF commi
   outer display. When a slot frees up, run `-forceFold YES -logStage YES` on Games Duo; it logs the real insets.
 
 **Screenshots** are composed by `docs/store/compose.swift` from iPhone 17e simulator captures of the bundled demos.
-The Duo shots come from DEBUG `-pose` captures cropped to the Duo's 1.42 canvas, not from the Duo simulator.
+The Duo **inner** shots were retaken 2026-11-17 on the real iPhone Duo simulator (Relics Duo BD9038FF, unfolded, `--display=LCD-1`, `-forceFold YES`; the 84 pt right-edge status bar is clear of everything). The **outer** shots are still the earlier 17e-based ones: the outer display only lights when the sim is folded, which only Gordon can do.
 - **Duo inner, 2007x2853:** `docs/store/shots/duo-inner/` holds 6 shots: table µCity, table Thwaite with the quick-slot
   thumbnails, table DS (our own test cart; the caption doesn't claim a game), book Alex vs Bus, flat Libbet, and the
   shelf in table pose.
