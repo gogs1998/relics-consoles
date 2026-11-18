@@ -86,6 +86,8 @@ Not used in 1.0: the metadata locked when 1.0 went to review. After approval, sw
 the subtitle and description change with the next version. **Don't say "only" or "first" emulator for Duo:** Delta 2.0 and Manic EMU
 both ship Duo layouts (docs/duo-competitors.md), so that claim fails Apple 2.3.1 and the UK ASA rules. Our true edge: built for
 Duo first, a layout for every system (theirs are DS-first), and a controller you design.
+Gordon rule (2026-11-18, via DUO): hardware in store and marketing copy should feel familiar. Lean on recognition; never use "never
+existed" or "fictional" as the hook. Legal small print and review notes stay as they are. This copy already complies (it names the real systems).
 
 Subtitle (29): Seven retro consoles, one Duo
 
