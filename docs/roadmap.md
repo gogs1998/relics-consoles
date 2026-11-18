@@ -11,6 +11,9 @@ NES, Game Boy / Game Boy Color, Game Boy Advance, SNES, Mega Drive, DS and N64, 
 - The portrait screen bezel should hug the picture (`PlayerView.portraitLayout` screenH).
 - A "hide demos" switch.
 - "More from Relics" cross-promo (on branch v1.1 in `~/duo-emulator-1.1`; needs rebasing onto the rename).
+- **Check layout on older iOS (found 2026-11-18, sim only):** on an iOS 27.0 iPhone simulator the stage canvas is smaller than the
+  screen. The shelf is cut off about 80% of the way down, and the landscape controls bunch in against the picture. iOS 27.1 is
+  fine (the 1.0 shots). Deployment target is iOS 26, so check on 26.x and 27.0 (DuoStage bounds 390x763 = safe area, then inset again?).
 - **Store screenshots reshoot (Gordon 2026-11-18: "first one look crap").** Lead with an action shot that fills the screen and has
   filled save slots (Thwaite), not the µCity title screen with empty "+" slots. Drop the DS test-pattern shot until a real DS
   homebrew is approved. Shoot book pose upright. Redo the iPhone and iPad first shots too.
