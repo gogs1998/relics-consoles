@@ -19,6 +19,25 @@ NES, Game Boy / Game Boy Color, Game Boy Advance, SNES, Mega Drive, DS and N64, 
 - Put the new sell copy in (docs/store/listing.md "NEXT COPY") and the promo text, which can go in now without a version.
 - Make Libbet's system label match: it's GBC on the shelf but "Game Boy" in the review notes.
 
+## New systems (Gordon 2026-11-18: "lets add all including sony")
+**1.1, quick wins on the ares engine we already vendor (ISC):** Master System, Game Gear, PC Engine (HuCard). Cartridge
+games should need no firmware; confirm for each before building. Mainly layouts (laptop, book, flat), our own test ROMs and testing.
+
+**Next big update, Sony:**
+- **PS1:** PCSX-ReARMed (GPL-2.0-or-later) with its free HLE BIOS, never Sony firmware. Interpreter or no-JIT build.
+  Needs a Fable licence review. Disc images: .cue/.bin and .chd from the user's own discs.
+- **PSP:** PPSSPP (GPL-2.0-or-later), no-JIT build (it already runs on iOS without JIT). No firmware needed. Fable licence review.
+  This is a system Delta doesn't have.
+
+**Blocked: on the list but not buildable under the current rules:**
+- **3DS:** speed needs JIT (no App Store JIT; our hard rule), and most games need console keys or system files from the
+  player's own 3DS (firmware rule). Revisit only if Apple allows JIT or a no-key path appears.
+- **Neo Geo:** needs SNK's BIOS (no free replacement); FinalBurn is non-commercial (banned). Only possible via player-imported BIOS.
+- **Sega CD, Saturn, 32X:** need Sega BIOS files (32X boot ROMs too). Only possible via player-imported BIOS.
+- **Dreamcast:** BIOS plus JIT for speed.
+- **Player-imported BIOS** would unlock Neo Geo, Sega CD, Saturn and 32X, but it changes the no-firmware rule and adds App Review
+  risk. Gordon's decision, not made. The recommendation is no for now.
+
 ## Later (no version set)
 - **iPhone as controller** (Gordon, 2026-11-17: "add it to later roadmap maybe standalone"). Your iPhone becomes the gamepad
   over local Wi-Fi for Relics: Consoles running on an iPad, or on a future Mac version. It reuses the Wi-Fi play networking
