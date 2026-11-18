@@ -1,6 +1,6 @@
 # Relics: Consoles roadmap
 
-## v1.0 (submitted 2026-11-17, build 10)
+## v1.0 (build 10, LIVE by 2026-11-18)
 NES, Game Boy / Game Boy Color, Game Boy Advance, SNES, Mega Drive, DS and N64, plus the iPhone Duo features and customisable controls.
 
 ## 1.1 / v2 (agreed with Gordon)
@@ -11,6 +11,12 @@ NES, Game Boy / Game Boy Color, Game Boy Advance, SNES, Mega Drive, DS and N64, 
 - The portrait screen bezel should hug the picture (`PlayerView.portraitLayout` screenH).
 - A "hide demos" switch.
 - "More from Relics" cross-promo (on branch v1.1 in `~/duo-emulator-1.1`; needs rebasing onto the rename).
+- **Store screenshots reshoot (Gordon 2026-11-18: "first one look crap").** Lead with an action shot that fills the screen and has
+  filled save slots (Thwaite), not the µCity title screen with empty "+" slots. Drop the DS test-pattern shot until a real DS
+  homebrew is approved. Shoot book pose upright. Redo the iPhone and iPad first shots too.
+- **Face buttons too close** (Gordon 2026-11-18): A, B and the small "+" between them are cramped in the default layout. Space
+  them out, and check against thumb size on a real iPhone.
+- Put the new sell copy in (docs/store/listing.md "NEXT COPY") and the promo text, which can go in now without a version.
 - Make Libbet's system label match: it's GBC on the shelf but "Game Boy" in the review notes.
 
 ## Later (no version set)

@@ -9,7 +9,7 @@ email to gordon@iqlabs.app, plus a tree-filter replacing Gordon's personal addre
 origin and check `merge-base --is-ancestor origin/main main`. The rewrite is deterministic, so it fast-forwards. Push main (never force).
 Never put the personal address in a tracked file other than CLAUDE.md.
 
-**SUBMITTED 2026-11-17 22:54 UTC: build 10, Waiting for Review, manual release. China mainland removed from availability (paid game needs an NPPA approval number; the China-only Security and AI compliance forms were blocking).**
+**LIVE (READY_FOR_SALE by 2026-11-18). Submitted 2026-11-17 22:54 UTC: build 10, Waiting for Review, manual release. China mainland removed from availability (paid game needs an NPPA approval number; the China-only Security and AI compliance forms were blocking).**
 **Fable pre-submit (2026-11-17): "source on request" fails GPLv3 §6(d) for App Store downloads; fix = public repo before SALE (Gordon deciding:
 manual release + public on release day, or drop DS/N64). Public copy is pre-built, not pushed: scratchpad public-copy, emails rewritten to
 gordon@iqlabs.app in authors AND CLAUDE.md history, tag v1.0-build9. Also: Libbet is GBC on the shelf but "Game Boy" in review notes; align.**
