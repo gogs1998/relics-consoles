@@ -12,12 +12,12 @@ func c(_ h: Int, _ a: CGFloat = 1) -> NSColor {
 }
 let sets: [String: (w: Int, h: Int, shots: [S])] = [
     "inner": (2007, 2853, [
-        S(file: "1-table-ucity", title: "Fold it.\nNow it's a handheld.", sub: "Game on the upright screen, controller flat under your thumbs", accent: 0xFF6B3D),
-        S(file: "2-table-thwaite", title: "Quick saves\nalong the hinge", sub: "Three picture slots, rewind and fast-forward", accent: 0xE0A33B),
-        S(file: "3-table-ds", title: "Two screens,\nthe way they were", sub: "Top screen up, touch screen flat under your finger", accent: 0x8C80B3),
-        S(file: "4-book-alexvsbus", title: "Open it\nlike a book", sub: "The game on one page, the controls across both", accent: 0x4D5C7A),
-        S(file: "5-flat-libbet", title: "Flat, it's\na classic handheld", sub: "Every layout editable and remembered per pose", accent: 0x5C7A99),
-        S(file: "6-shelf", title: "Your games,\non your shelf", sub: "Add the games you own from Files", accent: 0xE86E59),
+        S(file: "1-table-thwaite", title: "Fold it.\nNow it's a handheld.", sub: "Game on the upright screen, controller flat under your thumbs", accent: 0xFF6B3D),
+        S(file: "2-table-editor", title: "Build your\nown controller", sub: "Drag, resize or hide any button, for every game and pose", accent: 0x5C7A99),
+        S(file: "3-table-alexvsbus", title: "Quick saves\nalong the hinge", sub: "Three picture slots, rewind and fast-forward", accent: 0xE0A33B),
+        S(file: "4-book-ucity", title: "Open it like a book", sub: "The game on one page, the controls across both", accent: 0x4D5C7A),
+        S(file: "5-flat-libbet", title: "Flat, it's\na classic handheld", sub: "Every console has its own layout for every pose", accent: 0x8C80B3),
+        S(file: "6-shelf", title: "Your games,\non your shelf", sub: "NES to N64: add the games you own from Files", accent: 0xE86E59),
     ]),
     "outer": (1398, 2034, [
         S(file: "1-outer-shelf", title: "Your games,\non your shelf", sub: "Add the games you own from Files", accent: 0xE86E59),
@@ -25,15 +25,15 @@ let sets: [String: (w: Int, h: Int, shots: [S])] = [
         S(file: "3-outer-settings", title: "Make it yours", sub: "Screen styles, volume, fast-forward speed", accent: 0xFF6B3D),
     ]),
     "ipad13": (2064, 2752, [
-        S(file: "1-ucity", title: "Play the retro\ngames you own", sub: "Eight classic systems, one shelf", accent: 0xFF6B3D),
+        S(file: "1-thwaite", title: "Play the retro\ngames you own", sub: "NES to N64: seven consoles, one shelf", accent: 0xFF6B3D),
         S(file: "2-editor", title: "Make the\ncontroller yours", sub: "Move, resize, fade or hide any button", accent: 0x5C7A99),
-        S(file: "3-thwaite", title: "A big screen\nfor small pixels", sub: "Sharp pixels, scanlines or a handheld LCD look", accent: 0xE0A33B),
+        S(file: "3-alexvsbus", title: "A big screen\nfor small pixels", sub: "Sharp pixels, scanlines or a handheld LCD look", accent: 0xE0A33B),
         S(file: "4-shelf", title: "Your games,\non your shelf", sub: "Add the games you own from Files", accent: 0xE86E59),
     ]),
     "iphone69": (1320, 2868, [
-        S(file: "1-ucity", title: "Play the retro\ngames you own", sub: "Eight classic systems, one shelf", accent: 0xFF6B3D),
+        S(file: "1-thwaite", title: "Play the retro\ngames you own", sub: "NES to N64: seven consoles, one shelf", accent: 0xFF6B3D),
         S(file: "2-editor", title: "Make the\ncontroller yours", sub: "Move, resize, fade or hide any button", accent: 0x5C7A99),
-        S(file: "3-thwaite", title: "Save anywhere,\nrewind anytime", sub: "Picture save states, rewind and fast-forward", accent: 0xE0A33B),
+        S(file: "3-alexvsbus", title: "Save anywhere,\nrewind anytime", sub: "Picture save states, rewind and fast-forward", accent: 0xE0A33B),
         S(file: "4-landscape", title: "Turn it sideways", sub: "Controls beside the picture", accent: 0x4D5C7A),
         S(file: "5-shelf", title: "Your games,\non your shelf", sub: "Add the games you own from Files", accent: 0xE86E59),
     ]),
@@ -54,7 +54,10 @@ for s in spec.shots {
         print("skip \(s.file): no capture"); continue
     }
     // A landscape capture is turned a quarter (the phone held sideways) so it fills the portrait frame.
-    if cg.width > cg.height {
+    // Duo inner accepts landscape (2853x2007): book-pose captures stay sideways on a landscape canvas (1.0.1).
+    let landscape = set == "inner" && cg.width > cg.height
+    let CW = landscape ? H : W, CH = landscape ? W : H
+    if cg.width > cg.height && !landscape {
         let r = CGContext(data: nil, width: cg.height, height: cg.width, bitsPerComponent: 8, bytesPerRow: 0,
                           space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
         r.translateBy(x: CGFloat(cg.height), y: 0)
@@ -63,27 +66,27 @@ for s in spec.shots {
         cg = r.makeImage()!
     }
     let img = NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
-    let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: W, pixelsHigh: H, bitsPerSample: 8, samplesPerPixel: 4,
+    let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: CW, pixelsHigh: CH, bitsPerSample: 8, samplesPerPixel: 4,
                                hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
-    rep.size = NSSize(width: W, height: H)
+    rep.size = NSSize(width: CW, height: CH)
     NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-    let full = NSRect(x: 0, y: 0, width: W, height: H)
+    let full = NSRect(x: 0, y: 0, width: CW, height: CH)
     NSGradient(colors: [c(0x25282E), c(0x1C1E23), c(0x111215)])!.draw(in: full, angle: -90)
     // A soft ember glow behind the device.
     let glow = NSGradient(colors: [c(s.accent, 0.38), c(s.accent, 0)])!
-    glow.draw(in: NSRect(x: -CGFloat(W) * 0.25, y: -CGFloat(H) * 0.15, width: CGFloat(W) * 1.5, height: CGFloat(H) * 0.95),
+    glow.draw(in: NSRect(x: -CGFloat(CW) * 0.25, y: -CGFloat(CH) * 0.15, width: CGFloat(CW) * 1.5, height: CGFloat(CH) * 0.95),
               relativeCenterPosition: NSPoint(x: 0, y: -0.2))
     let para = NSMutableParagraphStyle(); para.alignment = .center; para.lineSpacing = 4 * k
     let ink = c(0xEDE8DE)
-    (s.title as NSString).draw(in: NSRect(x: 80 * k, y: CGFloat(H) - 470 * k, width: CGFloat(W) - 160 * k, height: 380 * k),
+    (s.title as NSString).draw(in: NSRect(x: 80 * k, y: CGFloat(CH) - 470 * k, width: CGFloat(CW) - 160 * k, height: 380 * k),
                                withAttributes: [.font: titleFont, .foregroundColor: ink, .paragraphStyle: para])
-    (s.sub as NSString).draw(in: NSRect(x: 100 * k, y: CGFloat(H) - 600 * k, width: CGFloat(W) - 200 * k, height: 150 * k),
+    (s.sub as NSString).draw(in: NSRect(x: 100 * k, y: CGFloat(CH) - 600 * k, width: CGFloat(CW) - 200 * k, height: 150 * k),
                              withAttributes: [.font: subFont, .foregroundColor: ink.withAlphaComponent(0.72), .paragraphStyle: para])
     // The real capture, untouched, in a device outline running off the bottom.
     let aspect = CGFloat(cg.width) / CGFloat(cg.height)
-    var shotH = CGFloat(H) - 660 * k, shotW = shotH * aspect
-    if shotW > CGFloat(W) - 140 * k { shotW = CGFloat(W) - 140 * k; shotH = shotW / aspect }
-    let rect = NSRect(x: (CGFloat(W) - shotW) / 2, y: 0, width: shotW, height: shotH)
+    var shotH = CGFloat(CH) - 660 * k, shotW = shotH * aspect
+    if shotW > CGFloat(CW) - 140 * k { shotW = CGFloat(CW) - 140 * k; shotH = shotW / aspect }
+    let rect = NSRect(x: (CGFloat(CW) - shotW) / 2, y: 0, width: shotW, height: shotH)
     let body = rect.insetBy(dx: -24 * k, dy: -24 * k)
     let shadow = NSShadow(); shadow.shadowBlurRadius = 70 * k; shadow.shadowColor = NSColor(white: 0, alpha: 0.6)
     shadow.shadowOffset = NSSize(width: 0, height: -16 * k)
@@ -95,9 +98,9 @@ for s in spec.shots {
     img.draw(in: rect); NSGraphicsContext.restoreGraphicsState()
     NSGraphicsContext.current?.flushGraphics()
     // App Store: RGB, no alpha.
-    let ctx = CGContext(data: nil, width: W, height: H, bitsPerComponent: 8, bytesPerRow: 0,
+    let ctx = CGContext(data: nil, width: CW, height: CH, bitsPerComponent: 8, bytesPerRow: 0,
                         space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
-    ctx.draw(rep.cgImage!, in: CGRect(x: 0, y: 0, width: W, height: H))
+    ctx.draw(rep.cgImage!, in: CGRect(x: 0, y: 0, width: CW, height: CH))
     let flat = NSBitmapImageRep(cgImage: ctx.makeImage()!)
     try! flat.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: "\(out)/\(s.file).png"))
     written.append(s.file)
