@@ -361,14 +361,14 @@ enum ControllerLayout {
     }
 
     /// Face buttons centred on `c`, button diameter `d`.
-    static func faceCluster(_ system: SystemID, centre c: CGPoint, diameter d: CGFloat, sixButton: Bool, compact: Bool = false) -> [Control] {
+    static func faceCluster(_ system: SystemID, centre c: CGPoint, diameter d: CGFloat, sixButton: Bool) -> [Control] {
         func button(_ s: InputState, _ label: String, _ tone: Control.Tone, _ x: CGFloat, _ y: CGFloat, scale: CGFloat = 1) -> Control {
             let dd = d * scale
             return Control(kind: .face(s, label, tone), frame: CGRect(x: x - dd / 2, y: y - dd / 2, width: dd, height: dd))
         }
         switch system {
         case .snes, .ds:
-            let r = d * (compact ? 0.78 : 0.88)   // 1.0.1: wider diamond, ~0.38d between neighbours (was 0.24d); compact in landscape
+            let r = d * 0.88   // 1.0.1: wider diamond, ~0.38d between neighbours (was 0.24d)
             return [
                 button(.x, "X", .sand, c.x, c.y - r, scale: 0.86),
                 button(.y, "Y", .sand, c.x - r, c.y, scale: 0.86),
@@ -376,7 +376,7 @@ enum ControllerLayout {
                 button(.b, "B", .ember, c.x, c.y + r, scale: 0.86),
             ]
         case .md:
-            let gap = d * (compact ? (sixButton ? 0.98 : 1.08) : (sixButton ? 1.02 : 1.12))   // 1.0.1: a little more room; compact in landscape
+            let gap = d * (sixButton ? 1.02 : 1.12)   // 1.0.1: a little more room
             var list = [
                 button(.y, "A", .sand, c.x - gap, c.y + d * 0.28, scale: 0.84),
                 button(.b, "B", .ember, c.x, c.y + d * 0.06, scale: 0.84),
@@ -393,7 +393,7 @@ enum ControllerLayout {
             return list
         default:
             // 1.0.1 (Gordon: "buttons are too close"): ~0.75d clear between B and A (was ~0.48d), so the AB zone has room.
-            let sx: CGFloat = compact ? 0.61 : 0.72, sy: CGFloat = compact ? 0.42 : 0.48   // landscape margins are narrow
+            let sx: CGFloat = 0.72, sy: CGFloat = 0.48
             let b = button(.b, "B", .sand, c.x - d * sx, c.y + d * sy)
             let a = button(.a, "A", .ember, c.x + d * sx, c.y - d * sy)
             return [b, a, comboAB(between: b, and: a)]
@@ -533,14 +533,17 @@ enum ControllerLayout {
         let w = size.width, h = size.height
         let side = max(120, gameRect.minX)
         let dpad = min(side * 0.82, h * 0.42)
-        let face = dpad * (system == .snes || system == .ds || system == .md ? 0.34 : 0.38)   // 1.0.1: keep clear of the picture
+        // 1.0.1 (Gordon: "tight in landscape"): roomy spacing like portrait, with the size capped by the margin so the
+        // whole cluster fits inside it (two-button 2.44d, diamond 2.62d, Mega Drive 3.08d wide).
+        let face = min(dpad * (system == .snes || system == .ds || system == .md ? 0.36 : 0.42),
+                       side * (system == .md ? 0.27 : 0.31))
         var c: [Control] = []
         c.append(Control(kind: .dpad, frame: CGRect(x: side * 0.5 - dpad / 2, y: h * 0.58 - dpad / 2, width: dpad, height: dpad)))
         let rx = w - side * 0.5
         if preset == .arcade {
             c += arcadeCluster(system, centre: CGPoint(x: rx - side * 0.04, y: h * 0.58), diameter: min(side * 0.24, h * 0.16))
         } else {
-            c += faceCluster(system, centre: CGPoint(x: rx, y: h * 0.6), diameter: face, sixButton: sixButton, compact: true)
+            c += faceCluster(system, centre: CGPoint(x: rx, y: h * 0.6), diameter: face, sixButton: sixButton)
         }
         if system != .md || sixButton {
             c.append(Control(kind: .pill(.select, system == .md ? "MODE" : "SELECT"),
