@@ -124,9 +124,16 @@ struct RootView: View {
     ///   -freshStart YES         ignore the auto-save
     ///   -editControls YES       open the touch-layout editor after 2 s
     ///   -openSettings YES       open Settings over the game after 2 s
+    ///   -seedHistory YES        give every game a last-played time (killed runs never record play)
     private func debugAutoplay() {
         #if DEBUG
         let d = UserDefaults.standard
+        if d.bool(forKey: "seedHistory") {
+            // Store shots: give every game on the shelf a plausible play history.
+            for (i, g) in store.games.enumerated() {
+                store.debugSetPlayed(g.id, ago: Double(i + 1) * 5400, seconds: Double(2400 + i * 1700))
+            }
+        }
         guard let name = d.string(forKey: "autoplay"),
               let game = store.games.first(where: { $0.fileName == name || $0.title == name }) else { return }
         play(game)

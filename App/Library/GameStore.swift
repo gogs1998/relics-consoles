@@ -313,6 +313,15 @@ final class GameStore {
         save()
     }
 
+    #if DEBUG
+    func debugSetPlayed(_ id: String, ago: TimeInterval, seconds: Double) {
+        guard let i = games.firstIndex(where: { $0.id == id }) else { return }
+        games[i].lastPlayed = Date().addingTimeInterval(-ago)
+        games[i].playSeconds = seconds
+        save()
+    }
+    #endif
+
     func rename(_ id: String, to title: String) {
         guard let i = games.firstIndex(where: { $0.id == id }) else { return }
         let t = title.trimmingCharacters(in: .whitespacesAndNewlines)
