@@ -74,7 +74,9 @@ for s in spec.shots {
     NSGradient(colors: [c(0x25282E), c(0x1C1E23), c(0x111215)])!.draw(in: full, angle: -90)
     // A soft ember glow behind the device.
     let glow = NSGradient(colors: [c(s.accent, 0.38), c(s.accent, 0)])!
-    glow.draw(in: NSRect(x: -CGFloat(CW) * 0.25, y: -CGFloat(CH) * 0.15, width: CGFloat(CW) * 1.5, height: CGFloat(CH) * 0.95),
+    // Its top edge reads as a header band: keep it under the subtitle on landscape canvases too.
+    let glowH = landscape ? CGFloat(CH) * 1.15 - 640 * k : CGFloat(CH) * 0.95
+    glow.draw(in: NSRect(x: -CGFloat(CW) * 0.25, y: -CGFloat(CH) * 0.15, width: CGFloat(CW) * 1.5, height: glowH),
               relativeCenterPosition: NSPoint(x: 0, y: -0.2))
     let para = NSMutableParagraphStyle(); para.alignment = .center; para.lineSpacing = 4 * k
     let ink = c(0xEDE8DE)
