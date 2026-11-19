@@ -82,6 +82,7 @@ Gordon supplies it. Marketing: optional.
 (first version: none)
 
 ## NEXT COPY (Gordon 2026-11-17: "really sell it"). Use from the first editable moment
+Console count (1.0.2): always **eight**, one per system name (NES, SNES, Game Boy, Game Boy Color, Game Boy Advance, Mega Drive, DS, N64). Never "seven".
 Not used in 1.0: the metadata locked when 1.0 went to review. After approval, swap in the promotional text (no new version needed);
 the subtitle and description change with the next version. **Don't say "only" or "first" emulator for Duo:** Delta 2.0 and Manic EMU
 both ship Duo layouts (docs/duo-competitors.md), so that claim fails Apple 2.3.1 and the UK ASA rules. Our true edge: built for
@@ -89,18 +90,18 @@ Duo first, a layout for every system (theirs are DS-first), and a controller you
 Gordon rule (2026-11-18, via DUO): hardware in store and marketing copy should feel familiar. Lean on recognition; never use "never
 existed" or "fictional" as the hook. Legal small print and review notes stay as they are. This copy already complies (it names the real systems).
 
-Subtitle (29): Seven retro consoles, one Duo
+Subtitle (29): Eight retro consoles, one Duo
 
-Promotional text (170): Built for iPhone Duo first. Fold it like a laptop: the game stands up top, a controller you design lies flat below. NES to N64, seven consoles, all laid out for the fold.
+Promotional text (170): Built for iPhone Duo first. Fold it like a laptop: the game stands up top, a controller you design lies flat below. NES to N64, eight consoles, all laid out for the fold.
 
 Description opening (replaces the first paragraph; the rest stays):
-Seven classic consoles. One phone that folds. Built for exactly that.
+Eight classic consoles. One phone that folds. Built for exactly that.
 
 Relics: Consoles was designed for iPhone Duo first, not adapted to it afterwards. Every system has its own layout for
-laptop pose, book pose and flat, not just the two-screen ones. Fold it open and the game stands up on the top screen while a
+laptop pose, book pose and flat. Fold it open and the game stands up on the top screen while a
 full-size controller lies flat under your thumbs. Close it and it pauses and saves. Open it and you're back mid-jump.
 
 NES. SNES. Game Boy. Game Boy Color. Game Boy Advance. Mega Drive. Nintendo DS. Nintendo 64. All on one shelf, all
-playing the game files you own, and every one just as good on iPhone and iPad.
+playing the game files you own, and every one just as good on iPhone and iPad. A few free homebrew games are on the shelf to start, and you add your own from Files.
 
-Ad and social line: "Seven consoles. Built for the fold, not bolted on."
+Ad and social line: "Eight consoles. Built for the fold, not bolted on."

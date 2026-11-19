@@ -398,7 +398,13 @@ struct LayoutEditorPanel: View {
                     Button { importing = true } label: { Label("Import", systemImage: "square.and.arrow.down") }
                         .buttonStyle(ChipStyle(selected: false))
                 }
+                .padding(.trailing, 24)
             }
+            // A chip cut off by the panel edge looked broken on narrow screens: fade the edge so it reads as "scroll for more".
+            .mask(HStack(spacing: 0) {
+                Rectangle()
+                LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing).frame(width: 24)
+            })
             if let c = editor.selected() {
                 selectedControls(c)
             } else {
@@ -412,7 +418,8 @@ struct LayoutEditorPanel: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(Theme.graphite.opacity(0.97))
+                // Fully opaque: at 0.97 the game's title text showed through (store-shot review, 2026-11-19).
+                .fill(Theme.graphite)
                 .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Color.white.opacity(0.08)))
                 .shadow(color: .black.opacity(0.5), radius: 16, y: 8)
         )

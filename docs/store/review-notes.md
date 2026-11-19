@@ -18,7 +18,7 @@ use free replacements or high-level emulation written by the emulator authors (n
 Five free homebrew games are bundled so the shelf isn't empty. Each is the author's own unmodified release, shared
 under an open licence, and credited in the app under About › Free demos:
 - µCity 1.3 by Antonio Niño Díaz (Game Boy Color) - GPL-3.0-or-later, graphics and music CC BY-SA 4.0
-- Libbet and the Magic Floor 0.08 by Damian Yerrick (Game Boy) - zlib licence
+- Libbet and the Magic Floor 0.08 by Damian Yerrick (Game Boy, with Game Boy Color colours, so the shelf lists it under Game Boy Color) - zlib licence
 - Thwaite 0.03 by Damian Yerrick (NES) - GPL-3.0-or-later
 - Concentration Room 0.02 by Damian Yerrick (NES) - GPL-3.0-or-later
 - Alex vs Bus: The Race, version pre3 by M374LX (Mega Drive) - GPL-3.0-or-later, assets CC BY-SA 4.0

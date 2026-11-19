@@ -25,13 +25,13 @@ let sets: [String: (w: Int, h: Int, shots: [S])] = [
         S(file: "3-outer-settings", title: "Make it yours", sub: "Screen styles, volume, fast-forward speed", accent: 0xFF6B3D),
     ]),
     "ipad13": (2064, 2752, [
-        S(file: "1-thwaite", title: "Play the retro\ngames you own", sub: "NES to N64: seven consoles, one shelf", accent: 0xFF6B3D),
+        S(file: "1-thwaite", title: "Play the retro\ngames you own", sub: "NES to N64: eight consoles, one shelf", accent: 0xFF6B3D),
         S(file: "2-editor", title: "Make the\ncontroller yours", sub: "Move, resize, fade or hide any button", accent: 0x5C7A99),
-        S(file: "3-alexvsbus", title: "A big screen\nfor small pixels", sub: "Sharp pixels, scanlines or a handheld LCD look", accent: 0xE0A33B),
+        S(file: "3-alexvsbus", title: "A big screen\nfor small pixels", sub: "Crisp, even pixels on the big screen", accent: 0xE0A33B),
         S(file: "4-shelf", title: "Your games,\non your shelf", sub: "Add the games you own from Files", accent: 0xE86E59),
     ]),
     "iphone69": (1320, 2868, [
-        S(file: "1-thwaite", title: "Play the retro\ngames you own", sub: "NES to N64: seven consoles, one shelf", accent: 0xFF6B3D),
+        S(file: "1-thwaite", title: "Play the retro\ngames you own", sub: "NES to N64: eight consoles, one shelf", accent: 0xFF6B3D),
         S(file: "2-editor", title: "Make the\ncontroller yours", sub: "Move, resize, fade or hide any button", accent: 0x5C7A99),
         S(file: "3-alexvsbus", title: "Save anywhere,\nrewind anytime", sub: "Rewind and fast-forward, with picture saves in the menu", accent: 0xE0A33B),
         S(file: "4-landscape", title: "Turn it sideways", sub: "Controls beside the picture", accent: 0x4D5C7A),

@@ -101,7 +101,7 @@ struct LibraryView: View {
                             .padding(.horizontal, 20)
                         }
                     }
-                    Text("Plays games you own. Nothing is included or downloaded.")
+                    Text("No commercial games are included or downloaded.")
                         .font(.rounded(.caption))
                         .foregroundStyle(Theme.inkDim)
                         .frame(maxWidth: .infinity)
