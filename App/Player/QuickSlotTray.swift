@@ -68,10 +68,15 @@ private struct SlotTileFace: View {
             RoundedRectangle(cornerRadius: 9, style: .continuous)
                 .fill(full ? Theme.screenGlass : Color.white.opacity(0.03))
             if let image {
-                Image(uiImage: image)
-                    .interpolation(.none)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
+                // Fill inside a fixed box: a bare .fill image grows past the tile, so wide pictures
+                // (Mega Drive) spilled over their neighbours and out of the tray.
+                Color.clear
+                    .overlay {
+                        Image(uiImage: image)
+                            .interpolation(.none)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    }
                     .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                     .padding(2)
                     .overlay(
