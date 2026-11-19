@@ -3,6 +3,12 @@
 ## v1.0 (build 10, LIVE by 2026-11-18)
 NES, Game Boy / Game Boy Color, Game Boy Advance, SNES, Mega Drive, DS and N64, plus the iPhone Duo features and customisable controls.
 
+## 1.0.2 (agreed via DUO 2026-11-19, after 1.0.1 went to review)
+- **Store copy:** the NEXT COPY subtitle ("Seven retro consoles, one Duo") and the new description opening (docs/store/listing.md), with a quick Fable pass first. Fix the console count everywhere: the copy says "seven consoles", but there are eight system names (NES, GB, GBC, GBA, SNES, MD, DS, N64), so either count Game Boy / Game Boy Color as one console and say so, or say eight.
+- **iPad shot 3 caption** says "Sharp pixels, scanlines or a handheld LCD look", but the shot shows sharp pixels. Reshoot it with scanlines or LCD on, or change the caption (`docs/store/compose.swift`, ipad13 3-alexvsbus).
+- **Licence text ghosting:** the GPL text shows through behind the controller editor panel; make the panel opaque or hide what's behind it. Also, the Snap chip is clipped on iPhone.
+- **Shelf footer wording (Fable review 2026-11-19):** "Plays games you own. Nothing is included or downloaded." sits under the free demo cards and contradicts them. Change it to "No commercial games are included or downloaded."
+
 ## 1.1 / v2 (agreed with Gordon)
 - Two-phone multiplayer over local Wi-Fi ("Wi-Fi play").
 - DS GPU renderer.
@@ -14,13 +20,11 @@ NES, Game Boy / Game Boy Color, Game Boy Advance, SNES, Mega Drive, DS and N64, 
 - **Check layout on older iOS (found 2026-11-18, sim only):** on an iOS 27.0 iPhone simulator the stage canvas is smaller than the
   screen. The shelf is cut off about 80% of the way down, and the landscape controls bunch in against the picture. iOS 27.1 is
   fine (the 1.0 shots). Deployment target is iOS 26, so check on 26.x and 27.0 (DuoStage bounds 390x763 = safe area, then inset again?).
-- **Shelf footer wording (Fable review 2026-11-19):** "Plays games you own. Nothing is included or downloaded." sits under the free demo cards and contradicts them. Change to "No commercial games are included or downloaded." in the next build.
 - **Store screenshots reshoot (Gordon 2026-11-18: "first one look crap").** Lead with an action shot that fills the screen and has
   filled save slots (Thwaite), not the µCity title screen with empty "+" slots. Drop the DS test-pattern shot until a real DS
   homebrew is approved. Shoot book pose upright. Redo the iPhone and iPad first shots too.
 - **Face buttons too close** (Gordon 2026-11-18): A, B and the small "+" between them are cramped in the default layout. Space
   them out, and check against thumb size on a real iPhone.
-- Put the new sell copy in (docs/store/listing.md "NEXT COPY") and the promo text, which can go in now without a version.
 - **Movable screen** (Gordon 2026-11-19: "could we maybe make the screen moveable too?"). In the controller editor, the game
   screen gets a handle like the buttons: drag to move it, pinch to resize it, per game and pose, saved with the layout
   (`SavedLayout` gains an optional screen frame, so old saves still load). Snap back to the default with Reset.
