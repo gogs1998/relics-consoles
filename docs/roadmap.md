@@ -3,7 +3,7 @@
 ## v1.0 (build 10, LIVE by 2026-11-18)
 NES, Game Boy / Game Boy Color, Game Boy Advance, SNES, Mega Drive, DS and N64, plus the iPhone Duo features and customisable controls.
 
-## 1.0.2 (agreed via DUO 2026-11-19, after 1.0.1 went to review)
+## 1.0.2 (agreed via DUO 2026-11-19; code and copy done in ecd6f47, build 12 not uploaded yet)
 - **Store copy:** the NEXT COPY subtitle ("Seven retro consoles, one Duo") and the new description opening (docs/store/listing.md), with a quick Fable pass first. Fix the console count everywhere: the copy says "seven consoles", but there are eight system names (NES, GB, GBC, GBA, SNES, MD, DS, N64), so either count Game Boy / Game Boy Color as one console and say so, or say eight.
 - **iPad shot 3 caption** says "Sharp pixels, scanlines or a handheld LCD look", but the shot shows sharp pixels. Reshoot it with scanlines or LCD on, or change the caption (`docs/store/compose.swift`, ipad13 3-alexvsbus).
 - **Licence text ghosting:** the GPL text shows through behind the controller editor panel; make the panel opaque or hide what's behind it. Also, the Snap chip is clipped on iPhone.
