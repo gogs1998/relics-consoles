@@ -15,6 +15,19 @@ struct LibraryView: View {
     @State private var selected: GameRecord.ID?
     @State private var renaming: GameRecord?
     @State private var newTitle = ""
+    @State private var query = ""
+    @FocusState private var searchFocused: Bool
+
+    /// Matches the title, or the system ("snes", "game boy"), ignoring case and accents.
+    private func matches(_ g: GameRecord) -> Bool {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return true }
+        let opts: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
+        return g.title.range(of: q, options: opts) != nil
+            || g.system.displayName.range(of: q, options: opts) != nil
+            || g.system.rawValue.range(of: q, options: opts) != nil
+    }
+    private var searching: Bool { !query.trimmingCharacters(in: .whitespaces).isEmpty }
 
     private var focus: GameRecord? {
         store.games.first { $0.id == selected } ?? store.recentlyPlayed.first ?? store.sortedGames.first
@@ -25,7 +38,12 @@ struct LibraryView: View {
             BodySurface()
             if stage.fold.isActive && !stage.fold.frame.isEmpty && !store.games.isEmpty {
                 if stage.fold.axis == .horizontal {
-                    hero.place(stage.farHalf.insetBy(dx: 14, dy: 12))
+                    // Laptop pose: the keyboard covers the lower screen, so results show on the upright one while typing.
+                    if searchFocused {
+                        searchResults.place(stage.farHalf.insetBy(dx: 14, dy: 12))
+                    } else {
+                        hero.place(stage.farHalf.insetBy(dx: 14, dy: 12))
+                    }
                     HingeSeam(axis: .horizontal).place(stage.fold.frame)
                     shelf(compactHeader: true).place(stage.nearHalf)
                 } else {
@@ -80,7 +98,8 @@ struct LibraryView: View {
                 if store.games.isEmpty {
                     EmptyShelf { importing = true }
                 } else {
-                    if !store.recentlyPlayed.isEmpty && !compactHeader {
+                    searchField
+                    if !store.recentlyPlayed.isEmpty && !compactHeader && !searching {
                         section("Continue") {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 14) {
@@ -93,13 +112,23 @@ struct LibraryView: View {
                         }
                     }
                     ForEach(store.systemsPresent) { system in
-                        section(system.displayName) {
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: compactHeader ? 128 : 150), spacing: 14)],
-                                      spacing: 16) {
-                                ForEach(store.games(for: system)) { g in card(g, width: nil) }
+                        let found = store.games(for: system).filter(matches)
+                        if !found.isEmpty {
+                            section(system.displayName) {
+                                LazyVGrid(columns: [GridItem(.adaptive(minimum: compactHeader ? 128 : 150), spacing: 14)],
+                                          spacing: 16) {
+                                    ForEach(found) { g in card(g, width: nil) }
+                                }
+                                .padding(.horizontal, 20)
                             }
-                            .padding(.horizontal, 20)
                         }
+                    }
+                    if searching && !store.games.contains(where: matches) {
+                        Text("No games match \u{201C}\(query.trimmingCharacters(in: .whitespaces))\u{201D}")
+                            .font(.rounded(.body, weight: .semibold))
+                            .foregroundStyle(Theme.inkDim)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 24)
                     }
                     Text("No commercial games are included or downloaded.")
                         .font(.rounded(.caption))
@@ -111,6 +140,7 @@ struct LibraryView: View {
             .padding(.vertical, 14)
         }
         .scrollIndicators(.hidden)
+        .scrollDismissesKeyboard(.immediately)
     }
 
     private func header(compact: Bool) -> some View {
@@ -142,6 +172,33 @@ struct LibraryView: View {
         .padding(.horizontal, 20)
     }
 
+    /// Filters the shelf by title or system. Only searches games already on the shelf: nothing online.
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass").foregroundStyle(Theme.inkDim)
+            TextField("", text: $query, prompt: Text("Search your games").foregroundStyle(Theme.inkDim))
+                .font(.rounded(.body, weight: .medium))
+                .foregroundStyle(Theme.ink)
+                .tint(Theme.ember)
+                .focused($searchFocused)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+                .onSubmit { searchFocused = false }
+                .accessibilityIdentifier("library.search")
+            if !query.isEmpty {
+                Button { query = "" } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.inkDim)
+                }
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, 14).padding(.vertical, 10)
+        .background(Capsule().fill(Color.white.opacity(0.07)))
+        .overlay(Capsule().strokeBorder(Color.white.opacity(searchFocused ? 0.18 : 0.06)))
+        .padding(.horizontal, 20)
+    }
+
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title.uppercased())
@@ -167,6 +224,39 @@ struct LibraryView: View {
             Button(role: .destructive) { store.delete(g.id) } label: { Label("Remove", systemImage: "trash") }
         }
         .accessibilityHint(stage.fold.isActive ? "Selects the game; tap again to play" : "Plays the game")
+    }
+
+    // MARK: search results on the upright screen (Duo laptop pose)
+
+    private var searchResults: some View {
+        let found = store.sortedGames.filter(matches)
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text((searching ? "\(found.count) \(found.count == 1 ? "game" : "games")" : "All games").uppercased())
+                    .font(.rounded(.caption, weight: .heavy))
+                    .tracking(1.6)
+                    .foregroundStyle(Theme.inkDim)
+                if found.isEmpty {
+                    Text("No games match \u{201C}\(query.trimmingCharacters(in: .whitespaces))\u{201D}")
+                        .font(.rounded(.body, weight: .semibold))
+                        .foregroundStyle(Theme.inkDim)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
+                } else {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 128), spacing: 14)], spacing: 16) {
+                        ForEach(found) { g in
+                            Button { searchFocused = false; selected = g.id } label: {
+                                GameCard(game: g, artwork: store.artwork(for: g), highlighted: false)
+                            }
+                            .buttonStyle(CardPressStyle())
+                            .accessibilityHint("Selects the game")
+                        }
+                    }
+                }
+            }
+            .padding(6)
+        }
+        .scrollIndicators(.hidden)
     }
 
     // MARK: hero (Duo)

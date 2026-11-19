@@ -8,6 +8,7 @@ NES, Game Boy / Game Boy Color, Game Boy Advance, SNES, Mega Drive, DS and N64, 
 - **iPad shot 3 caption** says "Sharp pixels, scanlines or a handheld LCD look", but the shot shows sharp pixels. Reshoot it with scanlines or LCD on, or change the caption (`docs/store/compose.swift`, ipad13 3-alexvsbus).
 - **Licence text ghosting:** the GPL text shows through behind the controller editor panel; make the panel opaque or hide what's behind it. Also, the Snap chip is clipped on iPhone.
 - **Shelf footer wording (Fable review 2026-11-19):** "Plays games you own. Nothing is included or downloaded." sits under the free demo cards and contradicts them. Change it to "No commercial games are included or downloaded."
+- **Shelf search** (Gordon 2026-11-19): a search box filters the shelf by title or system. On the Duo in laptop pose the results show on the upright screen while the keyboard covers the lower one. Searches only games already on the shelf, never online (4.7 and the no-network rule).
 
 ## 1.1 / v2 (agreed with Gordon)
 - Two-phone multiplayer over local Wi-Fi ("Wi-Fi play").
@@ -28,6 +29,7 @@ NES, Game Boy / Game Boy Color, Game Boy Advance, SNES, Mega Drive, DS and N64, 
 - **Movable screen** (Gordon 2026-11-19: "could we maybe make the screen moveable too?"). In the controller editor, the game
   screen gets a handle like the buttons: drag to move it, pinch to resize it, per game and pose, saved with the layout
   (`SavedLayout` gains an optional screen frame, so old saves still load). Snap back to the default with Reset.
+- **Find games on this phone** (Gordon 2026-11-19, from "ROM search"): one tap adds game files sitting in the app's folder, or in a folder the person picks with the Files picker, that aren't on the shelf yet. Local files only: never an online ROM search or download link.
 - Make Libbet's system label match: it's GBC on the shelf but "Game Boy" in the review notes.
 
 ## New systems (Gordon 2026-11-18: "lets add all including sony")
