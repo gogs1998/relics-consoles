@@ -19,7 +19,8 @@ public final class FoldSimulator {
 
     /// Letterbox to the inner display's 669 x 951 pt aspect, so layout decided on an
     /// iPhone 17 Pro survives contact with the real 1.42 ratio.
-    public var constrainToDuoAspect = true
+    /// `-fullCanvas YES` turns it off, for ordinary-iPhone screenshots that should look like a release build.
+    public var constrainToDuoAspect = !UserDefaults.standard.bool(forKey: "fullCanvas")
 
     /// Width of the simulated division band, margins included. On hardware the real
     /// width comes from the SDK's region frame.
