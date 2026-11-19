@@ -239,9 +239,19 @@ struct PlayerView: View {
         // need less of the width, so the game gets 74%.
         let physical = model.physicalMode
         let mode: ScreenMode = physical && model.screenMode == .auto ? .integer : model.screenMode
-        let box = physical ? CGSize(width: c.width - 16, height: c.height - 8) : CGSize(width: c.width * (c.width >= 1000 ? 0.74 : 0.62), height: c.height - 16)
+        // 1.0.1 (Gordon: "have the screen centred"): a one-sided inset (the Duo's right-edge status bar) is
+        // reclaimed for the controls below the clock, so the picture centres on the glass and both sides
+        // get the same room. The top-right keys still stay clear of the clock (overlay's trailingReserve).
+        let reserve = physical ? 0 : max(0, stage.safeArea.trailing - stage.safeArea.leading)
+        let full = CGRect(x: c.minX, y: c.minY, width: c.width + reserve, height: c.height)
+        // Wide pictures (Mega Drive, GBA) get more of the width: Gordon "higher and bigger".
+        let wide = model.videoSize.width > model.videoSize.height * 1.2
+        let share: CGFloat = full.width >= 1000 ? 0.74 : (wide ? 0.66 : 0.62)
+        let box = physical ? CGSize(width: c.width - 16, height: c.height - 8) : CGSize(width: full.width * share, height: c.height - 16)
         let fit = ScreenFit.rect(video: model.videoSize, in: box, mode: mode, displayScale: displayScale)
-        let game = CGRect(x: c.midX - fit.size.width / 2, y: c.midY - fit.size.height / 2,
+        // Sits high: a third of the spare height above, two thirds below (Gordon: "the screen should be higher").
+        let gameY = physical ? c.midY - fit.size.height / 2 : c.minY + (c.height - fit.size.height) * 0.33
+        let game = CGRect(x: (physical ? c : full).midX - fit.size.width / 2, y: gameY,
                           width: fit.size.width, height: fit.size.height)
         let system = model.game.system, six = model.sixButtonPad
         let gameInArea = game.offsetBy(dx: -c.minX, dy: -c.minY)
@@ -253,8 +263,9 @@ struct PlayerView: View {
                 .accessibilityIdentifier("game.screen")
                 .place(game)
             if !physical {
-                controllerArea(.landscape, rect: c, avoiding: gameInArea) {
-                    ControllerLayout.overlay(c.size, gameRect: gameInArea, system: system, sixButton: six, preset: $0)
+                controllerArea(.landscape, rect: full, avoiding: gameInArea) {
+                    ControllerLayout.overlay(full.size, gameRect: gameInArea, system: system, sixButton: six,
+                                             trailingReserve: reserve, preset: $0)
                 }
             }
             toastView.place(CGRect(x: game.minX, y: game.minY + 10, width: game.width, height: max(40, game.height - 20)))

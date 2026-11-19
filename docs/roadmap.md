@@ -20,6 +20,9 @@ NES, Game Boy / Game Boy Color, Game Boy Advance, SNES, Mega Drive, DS and N64, 
 - **Face buttons too close** (Gordon 2026-11-18): A, B and the small "+" between them are cramped in the default layout. Space
   them out, and check against thumb size on a real iPhone.
 - Put the new sell copy in (docs/store/listing.md "NEXT COPY") and the promo text, which can go in now without a version.
+- **Movable screen** (Gordon 2026-11-19: "could we maybe make the screen moveable too?"). In the controller editor, the game
+  screen gets a handle like the buttons: drag to move it, pinch to resize it, per game and pose, saved with the layout
+  (`SavedLayout` gains an optional screen frame, so old saves still load). Snap back to the default with Reset.
 - Make Libbet's system label match: it's GBC on the shelf but "Game Boy" in the review notes.
 
 ## New systems (Gordon 2026-11-18: "lets add all including sony")

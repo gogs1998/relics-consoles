@@ -527,8 +527,10 @@ enum ControllerLayout {
     }
 
     /// Landscape phone: controls in the margins either side of the game.
+    /// `trailingReserve`: width at the right edge kept clear at the top (the Duo's status bar clock); the
+    /// rest of that strip is usable, so the face buttons may sit under it.
     static func overlay(_ size: CGSize, gameRect: CGRect, system: SystemID, sixButton: Bool = false,
-                        preset: LayoutPreset = .standard) -> [Control] {
+                        trailingReserve: CGFloat = 0, preset: LayoutPreset = .standard) -> [Control] {
         if system == .n64 { return N64Layout.overlay(size, gameRect: gameRect) }
         let w = size.width, h = size.height
         let side = max(120, gameRect.minX)
@@ -556,8 +558,9 @@ enum ControllerLayout {
             c.append(Control(kind: .shoulder(.r, "R"), frame: CGRect(x: rx - tw / 2, y: 60, width: tw, height: 28)))
         }
         c.append(Control(kind: .menu, frame: CGRect(x: side * 0.5 - 17, y: 18, width: 34, height: 34)))
-        c.append(Control(kind: .fastForward, frame: CGRect(x: rx + 4, y: 18, width: 34, height: 34)))
-        c.append(Control(kind: .rewind, frame: CGRect(x: rx - 38, y: 18, width: 34, height: 34)))
+        let kx = min(rx, w - trailingReserve - 46)   // rewind / fast-forward stay left of the clock
+        c.append(Control(kind: .fastForward, frame: CGRect(x: kx + 4, y: 18, width: 34, height: 34)))
+        c.append(Control(kind: .rewind, frame: CGRect(x: kx - 38, y: 18, width: 34, height: 34)))
         return c
     }
 }
