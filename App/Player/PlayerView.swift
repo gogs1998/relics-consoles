@@ -197,7 +197,10 @@ struct PlayerView: View {
         let leftScreen = CGRect(x: left.minX + 12, y: left.minY + 12, width: left.width - 24, height: left.height * 0.6 - 12)
         let leftPad = CGRect(x: left.minX, y: leftScreen.maxY + 4, width: left.width, height: left.maxY - leftScreen.maxY - 8)
         let rightTop = CGRect(x: right.minX + 12, y: right.minY + 12, width: right.width - 24, height: right.height * 0.6 - 12)
-        let rightPad = CGRect(x: right.minX, y: rightTop.maxY + 4, width: right.width, height: right.maxY - rightTop.maxY - 8)
+        // The Duo's status bar is a right-edge column in book pose. Only its top (the clock) needs to stay clear,
+        // so the lower right controls run on under it to the glass edge instead of leaving an empty strip.
+        let reserve = max(0, stage.safeArea.trailing - stage.safeArea.leading)
+        let rightPad = CGRect(x: right.minX, y: rightTop.maxY + 4, width: right.width + reserve, height: right.maxY - rightTop.maxY - 8)
         let system = model.game.system, six = model.sixButtonPad
         return AnyView(ZStack(alignment: .topLeading) {
             screen(in: leftScreen)

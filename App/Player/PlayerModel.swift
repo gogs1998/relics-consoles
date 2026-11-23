@@ -299,12 +299,17 @@ final class PlayerModel {
         let thumb = currentThumbnail()
         let system = game.system, crc = romCRC, version = stateVersion
         session.send(.saveState { [weak self] payload in
-            guard let payload else {
-                if let completion { Task { @MainActor in completion() } }
+            // Some cores hand back an empty payload when the save fails (N64 core stopped, DS temp file on a
+            // full disk). Never let that, or a failed write, replace a good state or claim it was saved.
+            let data = payload.flatMap { $0.isEmpty ? nil : StateContainer(system: system, coreStateVersion: version,
+                                                                             romCRC: crc, payload: $0).encoded() }
+            guard let data, (try? data.write(to: url, options: .atomic)) != nil else {
+                Task { @MainActor in
+                    if slot != 0 { self?.show("Couldn't save to slot \(slot). Check there's free space on your iPhone.") }
+                    completion?()
+                }
                 return
             }
-            let data = StateContainer(system: system, coreStateVersion: version, romCRC: crc, payload: payload).encoded()
-            try? data.write(to: url, options: .atomic)
             if let png = thumb { try? png.write(to: thumbURL, options: .atomic) }
             Task { @MainActor in
                 self?.refreshSlots()
@@ -361,7 +366,15 @@ final class PlayerModel {
     }
 
     private func resumeAutoState() {
-        guard FileManager.default.fileExists(atPath: store.stateURL(for: game, slot: 0).path) else { return }
+        let stateURL = store.stateURL(for: game, slot: 0)
+        guard FileManager.default.fileExists(atPath: stateURL.path) else { return }
+        // The in-game save is clearly newer than the auto-save (the app was closed without leaving the game,
+        // so only the 30-second battery flush ran): resuming would roll its save memory back. Start fresh.
+        // Leaving normally writes the auto-save just before the battery, a moment apart, so allow some slack.
+        func modified(_ u: URL) -> Date? { try? u.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate }
+        if let s = modified(stateURL), let b = modified(store.batteryURL(for: game)), b.timeIntervalSince(s) > 20 {
+            return
+        }
         loadState(slot: 0)
     }
 

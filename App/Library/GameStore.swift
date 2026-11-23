@@ -44,6 +44,8 @@ enum ImportError: LocalizedError {
 @Observable
 final class GameStore {
     private(set) var games: [GameRecord] = []
+    /// Zips imported (or already on the shelf) during this import pass, so scanInbox can tell them from failures.
+    @ObservationIgnored private var importedFromZip: Set<String> = []
     var lastImportMessage: String?
 
     let documents: URL
@@ -87,10 +89,44 @@ final class GameStore {
     // MARK: persistence
 
     private func load() {
-        guard let data = try? Data(contentsOf: indexURL),
-              let list = try? JSONDecoder().decode([GameRecord].self, from: data) else { return }
+        guard let data = try? Data(contentsOf: indexURL) else { return }
+        guard let list = try? JSONDecoder().decode([GameRecord].self, from: data) else {
+            // Unreadable index (damaged, or written by a newer build): keep a copy and rebuild the shelf from
+            // the files in Games/, rather than starting empty and overwriting it on the next save.
+            let backup = documents.appendingPathComponent(".library.json.bak")
+            try? FileManager.default.removeItem(at: backup)
+            try? FileManager.default.copyItem(at: indexURL, to: backup)
+            rebuildFromGamesFolder()
+            save()
+            return
+        }
         games = list.filter {
             $0.isBundledTestCart || FileManager.default.fileExists(atPath: romURL(for: $0).path)
+        }
+    }
+
+    /// Puts every playable file already in Games/<system>/ back on the shelf (titles from file names).
+    private func rebuildFromGamesFolder() {
+        let fm = FileManager.default
+        var demoIDs: [String: String] = [:]   // id -> title, from the bundled demo files
+        if let dir = Bundle.main.url(forResource: "Demos", withExtension: nil) {
+            for (file, title) in Self.demoTitles {
+                if let d = try? Data(contentsOf: dir.appendingPathComponent(file)) { demoIDs[Self.gameID(d)] = title }
+            }
+        }
+        for system in SystemID.allCases {
+            let folder = gamesDir.appendingPathComponent(folderName(system), isDirectory: true)
+            guard let files = try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) else { continue }
+            for url in files.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+                guard let data = try? Data(contentsOf: url, options: .mappedIfSafe),
+                      CoreFactory.detect(rom: data, fileExtension: url.pathExtension) == system else { continue }
+                let id = Self.gameID(data)
+                if games.contains(where: { $0.id == id }) { continue }
+                let name = url.lastPathComponent
+                let demoTitle = demoIDs[id]
+                games.append(GameRecord(id: id, title: demoTitle ?? Self.title(fromFileName: name),
+                                        system: system, fileName: name, added: Date(), demo: demoTitle != nil ? true : nil))
+            }
         }
     }
 
@@ -121,10 +157,28 @@ final class GameStore {
         }
     }
 
+    /// Saves/<system>/<file name>.sav. Before 1.0.2 it was Saves/<name without extension>.sav, so Tetris.gb and Tetris.nes shared one
+    /// save. An old save moves to the new place only when exactly one game on the shelf could own it; otherwise
+    /// it stays where it is, untouched, rather than being given to the wrong game.
     func batteryURL(for game: GameRecord) -> URL {
         let base = (game.fileName as NSString).deletingPathExtension
         let prefix = game.isBundledTestCart ? "testcart-" : ""
-        return savesDir.appendingPathComponent("\(prefix)\(base).sav")
+        let folder = savesDir.appendingPathComponent(folderName(game.system), isDirectory: true)
+        // The whole file name, so Sonic.md and Sonic.gen (same folder) keep separate saves too.
+        let url = folder.appendingPathComponent("\(prefix)\(game.fileName).sav")
+        let fm = FileManager.default
+        if !fm.fileExists(atPath: url.path) {
+            let legacy = savesDir.appendingPathComponent("\(prefix)\(base).sav")
+            let owners = games.filter {
+                $0.isBundledTestCart == game.isBundledTestCart && ($0.fileName as NSString).deletingPathExtension == base
+            }
+            if fm.fileExists(atPath: legacy.path), owners.count <= 1 {
+                try? fm.createDirectory(at: folder, withIntermediateDirectories: true)
+                try? fm.moveItem(at: legacy, to: url)
+            }
+        }
+        try? fm.createDirectory(at: folder, withIntermediateDirectories: true)
+        return url
     }
 
     func stateDir(for game: GameRecord) -> URL {
@@ -205,7 +259,9 @@ final class GameStore {
             defer { try? FileManager.default.removeItem(at: dir) }
             let file = dir.appendingPathComponent(entry.fileName)
             try ZipArchive.extract(entry, from: data, to: file)
-            return try importOne(file, allowZip: false)
+            let result = try importOne(file, allowZip: false)
+            importedFromZip.insert(name)
+            return result
         } catch let e as ZipArchive.ZipError {
             throw ImportError.zip(name, e.errorDescription ?? "couldn't be opened.")
         }
@@ -231,6 +287,17 @@ final class GameStore {
         }
         try data.write(to: dest, options: .atomic)
         return fileName
+    }
+
+    /// A name in `folder` that doesn't exist yet: "Game.nes", then "Game (2).nes" and so on.
+    private func uniqueURL(in folder: URL, for name: String) -> URL {
+        let base = (name as NSString).deletingPathExtension, ext = (name as NSString).pathExtension
+        var url = folder.appendingPathComponent(name), n = 2
+        while FileManager.default.fileExists(atPath: url.path) {
+            url = folder.appendingPathComponent(ext.isEmpty ? "\(base) (\(n))" : "\(base) (\(n)).\(ext)")
+            n += 1
+        }
+        return url
     }
 
     // MARK: demos
@@ -294,14 +361,38 @@ final class GameStore {
         let inbox = documents.appendingPathComponent("Inbox", isDirectory: true)
         guard let files = try? FileManager.default.contentsOfDirectory(at: inbox, includingPropertiesForKeys: nil),
               !files.isEmpty else { return }
+        importedFromZip.removeAll()
         importFiles(files)
-        for f in files { try? FileManager.default.removeItem(at: f) }
+        // Only files that are now on the shelf leave the Inbox; one that failed is kept in
+        // "Not Imported" (visible in Files) instead of being deleted.
+        let kept = documents.appendingPathComponent("Not Imported", isDirectory: true)
+        for f in files {
+            let onShelf = (try? Data(contentsOf: f, options: .mappedIfSafe)).map { d in
+                games.contains { $0.id == Self.gameID(d) }
+            } ?? false
+            if onShelf || importedFromZip.contains(f.lastPathComponent) {
+                try? FileManager.default.removeItem(at: f)
+            } else {
+                try? FileManager.default.createDirectory(at: kept, withIntermediateDirectories: true)
+                try? FileManager.default.moveItem(at: f, to: uniqueURL(in: kept, for: f.lastPathComponent))
+            }
+        }
+        importedFromZip.removeAll()
     }
 
     func openURL(_ url: URL) {
+        // A cold launch from "Open in" has already imported (and removed) this Inbox copy in scanInbox.
+        let ours = isOurInbox(url)
+        if ours && !FileManager.default.fileExists(atPath: url.path) { return }
         importFiles([url])
         // "Open in" copies land in Documents/Inbox: don't import them again next launch.
-        if url.path.contains("/Documents/Inbox/") { try? FileManager.default.removeItem(at: url) }
+        // Only our own Inbox copy: with documents opened in place this can be the user's original file.
+        if ours { try? FileManager.default.removeItem(at: url) }
+    }
+
+    private func isOurInbox(_ url: URL) -> Bool {
+        let inbox = documents.appendingPathComponent("Inbox", isDirectory: true).resolvingSymlinksInPath().path
+        return url.resolvingSymlinksInPath().path.hasPrefix(inbox + "/")
     }
 
     // MARK: edits
@@ -337,8 +428,7 @@ final class GameStore {
         if !game.isBundledTestCart {
             let trash = documents.appendingPathComponent("Recently Deleted", isDirectory: true)
             try? FileManager.default.createDirectory(at: trash, withIntermediateDirectories: true)
-            try? FileManager.default.moveItem(at: romURL(for: game),
-                                              to: trash.appendingPathComponent(game.fileName))
+            try? FileManager.default.moveItem(at: romURL(for: game), to: uniqueURL(in: trash, for: game.fileName))
         }
         games.remove(at: i)
         save()

@@ -63,7 +63,9 @@ extension PlayerView {
         let rightScreen = dsFit(in: CGRect(x: right.minX + 12, y: right.minY + 12, width: right.width - 24, height: screenH))
         let padTop = left.minY + 12 + screenH + 4
         let leftPad = CGRect(x: left.minX, y: padTop, width: left.width, height: left.maxY - padTop - 4)
-        let rightPad = CGRect(x: right.minX, y: padTop, width: right.width, height: right.maxY - padTop - 4)
+        // Run the lower right controls on under the Duo's right-edge status column (only its clock needs room).
+        let reserve = max(0, stage.safeArea.trailing - stage.safeArea.leading)
+        let rightPad = CGRect(x: right.minX, y: padTop, width: right.width + reserve, height: right.maxY - padTop - 4)
         return ZStack(alignment: .topLeading) {
             dsScreen(Self.topRegion, at: leftScreen)
             HingeSeam(axis: .vertical).place(stage.fold.frame)
